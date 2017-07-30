@@ -30,6 +30,16 @@ namespace u
 		typedef char*   s;
 	}
 
+	struct TypeDescriptor {
+		char symbol;
+		uint8_t size;
+#if UNICORN_CFG_TYPE_DESCRIPTIONS == 1
+		const char *description;
+#endif
+	};
+
+	extern TypeDescriptor types[8];
+
 	uint8_t get_type_size(char symbol);
 	bool is_array_type(char symbol);
 	void* new_array_type(char symbol);

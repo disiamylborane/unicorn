@@ -14,16 +14,9 @@
 
 namespace u
 {
-	struct TypeDescriptor {
-		char symbol;
-		uint8_t size;
-#if UNICORN_CFG_TYPE_DESCRIPTIONS == 1
-		const char *description;
-#endif
-	};
 
 	TypeDescriptor types[] = {
-		__DECLARE_UNICORN_TYPE('?', sizeof(bool), "Bool")
+		__DECLARE_UNICORN_TYPE('q', sizeof(bool), "Bool")
 		__DECLARE_UNICORN_TYPE('c', sizeof(char), "Char")
 		__DECLARE_UNICORN_TYPE('b', sizeof(uint8_t), "Byte")
 		__DECLARE_UNICORN_TYPE('h', sizeof(uint16_t), "Short")
