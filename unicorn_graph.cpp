@@ -15,7 +15,7 @@ namespace u {
 
 	Graph::~Graph() {
 		for (Node *b : *nodes) {
-			b->destroy_ports();
+			destroy_ports(b);
 			delete b;
 		}
 		//TODO: delete const_buffer array elements
@@ -93,11 +93,11 @@ namespace u {
 		return _c_err;
 	}
 
-	void Graph::link(int bfrom, int bto) {
-		(*nodes)[bfrom]->next = (*nodes)[bto];
+	void Graph::link(int node, int port, int to) {
+		(*nodes)[node]->portlist[port] = (*nodes)[to];
 	}
-	void Graph::unlink(int bfrom) {
-		(*nodes)[bfrom]->next = NULL;
+	void Graph::unlink(int node, int port) {
+		(*nodes)[node]->portlist[port] = nullptr;
 	}
 
 	bool Graph::connect(int node1, int port1, int node2, int port2){
@@ -132,7 +132,7 @@ namespace u {
 				if ((*nodes)[node]->portlist[port] == (*const_buffer)[i])
 				{
 					(*nodes)[node]->portlist[port] = 0;
-					char tsym = (*nodes)[node]->get_port_symbol(port);
+					char tsym = get_port_symbol((*nodes)[node],port);
 					if (is_array_type(tsym))
 						_del_const_array(tsym, i);
 					else
@@ -160,7 +160,7 @@ namespace u {
 
 		void *newconst;
 		size_t size;
-		char sym = (*nodes)[node]->get_port_symbol(port);
+		char sym = get_port_symbol((*nodes)[node],port);
 		if (is_array_type(sym))
 			newconst = _add_const_array(sym);
 		else {

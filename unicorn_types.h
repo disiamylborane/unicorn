@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <vector>
 #include "unicorn_cfg.h"
+//#include "unicorn_block.h"
 
 namespace u
 {
@@ -25,10 +26,16 @@ namespace u
 		typedef int64_t l;
 		typedef float   f;
 		typedef double  d;
+		//Declared in block.h
+		//typedef struct Node n;
 
 		typedef uniseq* u;
 		typedef char*   s;
 	}
+	
+	//TODO: typedef Node* (*WorkFunction)();
+	//typedef type::n* (*WorkFunction)(port** portlist);
+	//typedef void (*TuneFunction)();
 
 	struct TypeDescriptor {
 		char symbol;
@@ -38,7 +45,7 @@ namespace u
 #endif
 	};
 
-	extern TypeDescriptor types[8];
+	extern TypeDescriptor types[];
 
 	uint8_t get_type_size(char symbol);
 	bool is_array_type(char symbol);

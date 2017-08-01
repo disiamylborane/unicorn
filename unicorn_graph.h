@@ -42,8 +42,8 @@ namespace u {
 
 		void move(int node, int deltax, int deltay);
 
-		void link(int bfrom, int bto);
-		void unlink(int bfrom);
+		void link(int node, int port, int to);
+		void unlink(int node, int port);
 
 		bool connect(int node1, int port1, int node2, int port2);
 		bool connect_const(int node, int port, void* data);

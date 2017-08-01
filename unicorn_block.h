@@ -14,29 +14,14 @@
 
 namespace u
 {
-	/*
-	class Block
-	{
-	public:
-		port **portlist;
-		Block* next;
-		int16_t xpos, ypos;
-		uint8_t inputs, outputs, ports, reserved;
-		uint32_t factory_index;
-
-		virtual void work() { return; };
-		virtual void tune() { return; };
-		virtual const char* ports_cfg() { return ""; };
-
-		char get_port_symbol(int index);
-
-		bool setup_ports();
-		void destroy_ports();
-	};*/
+	struct Node;
+	namespace type {
+		typedef struct Node n;
+	}
 	
 	struct Block
 	{
-		void (*work)(port** portlist);
+		type::n* (*work)(port** portlist);
 		void (*tune)();
 		const char* ports_cfg;
 		const char* name;
@@ -45,20 +30,18 @@ namespace u
 #endif
 	};
 	
-	class Node
+	struct Node
 	{
-	public:
 		port **portlist;
-		Node* next;
 		int16_t xpos, ypos;
 		uint8_t inputs, outputs, ports, reserved;
 		
 		const Block *core;
-		
-		char get_port_symbol(int index);
-		bool setup_ports();
-		void destroy_ports();
 	};
+	
+	char get_port_symbol(Node* node, int index);
+	bool setup_ports(Node* node);
+	void destroy_ports(Node* node);
 
 	void run_blocks(Node* start);
 }

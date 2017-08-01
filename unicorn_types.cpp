@@ -1,5 +1,6 @@
 
 #include "unicorn_types.h"
+#include "unicorn_block.h"
 
 #ifndef UNICORN_CFG_TYPE_DESCRIPTIONS
 #error "UNICORN_CFG_TYPE_DESCRIPTIONS not defined"
@@ -16,19 +17,20 @@ namespace u
 {
 
 	TypeDescriptor types[] = {
-		__DECLARE_UNICORN_TYPE('q', sizeof(bool), "Bool")
-		__DECLARE_UNICORN_TYPE('c', sizeof(char), "Char")
-		__DECLARE_UNICORN_TYPE('b', sizeof(uint8_t), "Byte")
-		__DECLARE_UNICORN_TYPE('h', sizeof(uint16_t), "Short")
-		__DECLARE_UNICORN_TYPE('i', sizeof(uint32_t), "Int")
-		__DECLARE_UNICORN_TYPE('l', sizeof(uint64_t), "Long Long")
-		__DECLARE_UNICORN_TYPE('f', sizeof(float), "Float")
-		__DECLARE_UNICORN_TYPE('d', sizeof(double), "Double")
+		__DECLARE_UNICORN_TYPE('q', sizeof(type::q), "Bool")
+		__DECLARE_UNICORN_TYPE('c', sizeof(type::c), "Char")
+		__DECLARE_UNICORN_TYPE('b', sizeof(type::b), "Byte")
+		__DECLARE_UNICORN_TYPE('h', sizeof(type::h), "Short")
+		__DECLARE_UNICORN_TYPE('i', sizeof(type::i), "Int")
+		__DECLARE_UNICORN_TYPE('l', sizeof(type::l), "Long Long")
+		__DECLARE_UNICORN_TYPE('f', sizeof(type::f), "Float")
+		__DECLARE_UNICORN_TYPE('d', sizeof(type::d), "Double")
+		__DECLARE_UNICORN_TYPE('n', sizeof(type::n), "Node")
 	};
 
 	TypeDescriptor arrays[] = {
-		__DECLARE_UNICORN_TYPE('s', 4, "String")
-		__DECLARE_UNICORN_TYPE('u', 4, "Uniseq")
+		__DECLARE_UNICORN_TYPE('s', sizeof(type::s), "String")
+		__DECLARE_UNICORN_TYPE('u', sizeof(type::u), "Uniseq")
 	};
 
 	uint8_t get_type_size(char symbol)

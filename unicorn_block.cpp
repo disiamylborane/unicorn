@@ -14,20 +14,20 @@ namespace u
 		return get_type_size(psym);
 	}
 
-	bool Node::setup_ports() {
-		uint8_t *_write = &inputs;
-		for (const char*c = core->ports_cfg; *c; c++) {
+	bool setup_ports(Node* node) {
+		uint8_t *_write = &node->inputs;
+		for (const char*c = node->core->ports_cfg; *c; c++) {
 			if (*c == UNICORN_CFG_BLOCK_DECOUPLER) {
-				_write = &outputs;
+				_write = &node->outputs;
 			}
 			if (*c == UNICORN_CFG_BLOCK_TYPEMARK)
 				(*_write)++;
 		}
-		ports = inputs + outputs;
+		node->ports = node->inputs + node->outputs;
 
 		size_t outs_length = 0;
-		for (int i = 0; i < outputs; i++) {
-			char psym = get_port_symbol(i + inputs);
+		for (int i = 0; i < node->outputs; i++) {
+			char psym = get_port_symbol(node, i + node->inputs);
 			if (is_array_type(psym))
 				continue;
 			uint8_t _size = _psym_size(psym);
@@ -38,16 +38,16 @@ namespace u
 			outs_length += _size;
 		}
 
-		size_t whole_ports_size = sizeof(void*)*(ports)+outs_length;
-		portlist = (port**)U_MALLOC(whole_ports_size);
-		if (!portlist) {
+		size_t whole_ports_size = sizeof(void*)*(node->ports)+outs_length;
+		node->portlist = (port**)U_MALLOC(whole_ports_size);
+		if (!node->portlist) {
 			return false;
 		}
-		memset(portlist, 0, whole_ports_size);
-		port** outlist = &portlist[inputs];
-		void* curr_port_address = &portlist[ports];
-		for (int i = 0; i < outputs; i++) {
-			char psym = get_port_symbol(i + inputs);
+		memset(node->portlist, 0, whole_ports_size);
+		port** outlist = &node->portlist[node->inputs];
+		void* curr_port_address = &node->portlist[node->ports];
+		for (int i = 0; i < node->outputs; i++) {
+			char psym = get_port_symbol(node, i + node->inputs);
 			if (is_array_type(psym)) {
 				void* _new_arr = new_array_type(psym);
 				if (!_new_arr)
@@ -65,20 +65,20 @@ namespace u
 		return true;
 	}
 
-	void Node::destroy_ports() {
-		port** outlist = &portlist[inputs];
-		for (int i = 0; i < outputs; i++) {
-			char psym = get_port_symbol(i + inputs);
+	void destroy_ports(Node* node) {
+		port** outlist = &node->portlist[node->inputs];
+		for (int i = 0; i < node->outputs; i++) {
+			char psym = get_port_symbol(node, i + node->inputs);
 			if (is_array_type(psym)) {
 				if(outlist[i])
 					delete_array_type(psym, outlist[i]);
 			}
 		}
-		U_FREE(portlist);
+		U_FREE(node->portlist);
 	}
 
-	char Node::get_port_symbol(int index) {
-		for (const char*c = core->ports_cfg; *c; c++) 
+	char get_port_symbol(Node* node, int index) {
+		for (const char*c = node->core->ports_cfg; *c; c++) 
 		{
 			if (*c == UNICORN_CFG_BLOCK_TYPEMARK) 
 			{
@@ -93,8 +93,7 @@ namespace u
 
 	void run_blocks(Node* start) {
 		while (start) {
-			start->core->work(start->portlist);
-			start = start->next;
+			start = (Node*)start->core->work(start->portlist);
 		}
 	}
 }

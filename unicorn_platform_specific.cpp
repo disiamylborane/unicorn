@@ -32,12 +32,12 @@ namespace u {
 			}
 		}
 		else if (strstr(s, "lnk ")) {
-			int i1, i2;
+			int i1, i2, i3;
 			w = &s[4];
-			if (sscanf(w, "%d %d", &i1, &i2) < 0)
+			if (sscanf(w, "%d %d %d", &i1, &i2, &i3) < 0)
 				cout << "Error\n";
 			else {
-				g->link(i1,i2);
+				g->link(i1, i2, i3);
 			}
 		}
 		else if (strstr(s, "cnt ")) {
@@ -81,7 +81,7 @@ namespace u {
 			for (auto i : *g->nodes) {
 				cout << "  Node" << i->core->ports_cfg << " {" << i;
 				cout << "} " << i->core->name << " [" << i->core->description;
-				cout << "] Linked to " << i->next << endl;
+				cout << "]" << endl;
 				int inputs = i->inputs;
 				for (int j = 0; j < inputs; j++) {
 					int* val = (int*)i->portlist[j];

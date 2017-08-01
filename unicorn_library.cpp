@@ -38,8 +38,13 @@
 #error "Wrong UNICORN_CFG_ARM_SPECIFIC_CODE parameter"
 #endif
 
-#define __workfunction(cls) void work_##cls(port** portlist)
+#define __workfunction(cls) type::n* work_##cls(port** portlist)
 
+#define _pl_var(_type, _port) (*((type::_type*)portlist[_port]))
+#define _pl_arr(_type, _port) (((type::_type)portlist[_port]))
+#define _pl_callnext(_port) return &_pl_var(n, _port)
+
+/*
 #define _pl_bool(n) (*((bool*)portlist[n]))
 #define _pl_c(n) (*((char*)portlist[n]))
 #define _pl_b(n) (*((uint8_t*)portlist[n]))
@@ -50,33 +55,39 @@
 #define _pl_d(n) (*((double*)portlist[n]))
 #define _pl_u(n) (((uniseq*)portlist[n]))
 #define _pl_s(n) (((char*)portlist[n]))
+*/
 
 namespace u
 {
 	__workfunction(AddArithmeticBlock){
-		_pl_i(2) = _pl_i(0) + _pl_i(1);
+		_pl_var(i, 3) = _pl_var(i, 1) + _pl_var(i, 2);
+		_pl_callnext(0);
 	}
 	__workfunction(SubArithmeticBlock)
 	{
-		_pl_i(2) = _pl_i(0) - _pl_i(1);
+		_pl_var(i, 3) = _pl_var(i, 1) - _pl_var(i, 2);
+		_pl_callnext(0);
 	}
 	__workfunction(MulArithmeticBlock)
 	{
-		_pl_i(2) = _pl_i(0) * _pl_i(1);
+		_pl_var(i, 3) = _pl_var(i, 1) * _pl_var(i, 2);
+		_pl_callnext(0);
 	}
 	__workfunction(UMulArithmeticBlock)
 	{
-		_pl_i(2) = ((unsigned)_pl_i(0) * (unsigned)_pl_i(1));
+		_pl_var(i, 3) = ((unsigned)_pl_var(i, 1) * (unsigned)_pl_var(i, 2));
+		_pl_callnext(0);
 	}
 	__workfunction(DivArithmeticBlock)
 	{
-		_pl_i(2) = _pl_i(0) / _pl_i(1);
+		_pl_var(i, 3) = _pl_var(i, 1) / _pl_var(i, 2);
+		_pl_callnext(0);
 	}
 
 	__workfunction(ReverseBitsBlock)
 	{
-		uint32_t x = _pl_i(0);
-		uint8_t bit_count = _pl_b(1);
+		uint32_t x = _pl_var(i, 1);
+		uint8_t bit_count = _pl_var(b, 2);
 #if UNICORN_CFG_ARM_SPECIFIC_CODE == 1
 		x = __RBIT(x);
 #else
@@ -88,16 +99,17 @@ namespace u
 		x = y;
 #endif
 		x >>= sizeof(uint32_t) * 8 - bit_count;
-		_pl_i(2) = x;
+		_pl_var(i, 3) = x;
+		_pl_callnext(0);
 	}
 
 	__workfunction(PulseCodeModulationBlock)
 	{
-		int32_t code = _pl_i(0);
-		uint8_t _bit_count = _pl_b(1);
-		uniseq *_sone = _pl_u(2);
-		uniseq *_szero = _pl_u(3);
-		uniseq *out = _pl_u(4);
+		int32_t code = _pl_var(i, 1);
+		uint8_t _bit_count = _pl_var(b, 2);
+		uniseq *_sone = _pl_arr(u, 3);
+		uniseq *_szero = _pl_arr(u, 4);
+		uniseq *out = _pl_arr(u, 5);
 		out->clear();
 
 		for (int mask = 1 << (_bit_count - 1); mask != 0; mask >>= 1) {
@@ -106,24 +118,26 @@ namespace u
 			else
 				uniseq_copy(out, _szero);
 		}
+		_pl_callnext(0);
 	}
 
 	__workfunction(PulseCountModulationBlock)
 	{
-		int32_t code = _pl_i(0);
+		int32_t code = _pl_var(i, 1);
 		for (; code > 0; code--) {
-			uniseq_copy(_pl_u(2), _pl_u(1));
+			uniseq_copy(_pl_arr(u, 3), _pl_arr(u, 2));
 		}
+		_pl_callnext(0);
 	}
 
 	__workfunction(PulseLengthModulationBlock)
 	{
-		int32_t code = _pl_i(0);
-		int32_t reference = _pl_i(1);
-		bool spacefirst = _pl_bool(2);
-		bool significantfirst = _pl_bool(3);
-		bool constsyncro = _pl_bool(4);
-		uniseq *out = _pl_u(5);
+		int32_t code = _pl_var(i, 1);
+		int32_t reference = _pl_var(i, 2);
+		bool spacefirst = _pl_var(q, 3);
+		bool significantfirst = _pl_var(q, 4);
+		bool constsyncro = _pl_var(q, 5);
+		uniseq *out = _pl_arr(u, 6);
 
 		int32_t nonsignificant = constsyncro ? reference : (code - reference);
 
@@ -131,21 +145,22 @@ namespace u
 			uniseq_add_value(significantfirst ? code : nonsignificant, out, spacefirst ? false : true);
 			uniseq_add_value(significantfirst ? nonsignificant : code, out, spacefirst ? true : false);
 		}
+		_pl_callnext(0);
 	}
 	
 	
-	static const char* ports_ArithmeticBlock = "=l=l|=l";
+	static const char* ports_ArithmeticBlock = "=n=l=l|=l";
 	declnotune(AddArithmeticBlock, ports_ArithmeticBlock, "+", "Add");
 	declnotune(SubArithmeticBlock, ports_ArithmeticBlock, "-", "Subtract");
 	declnotune(MulArithmeticBlock, ports_ArithmeticBlock, "*", "Signed Multiply");
 	declnotune(UMulArithmeticBlock,ports_ArithmeticBlock,"<*>","Uns<igned Multiply");
 	declnotune(DivArithmeticBlock, ports_ArithmeticBlock, "/", "Divide");
 
-	declnotune(ReverseBitsBlock,"=lx=bbitcount|=ly", "<-","Reverse bits");
+	declnotune(ReverseBitsBlock,"=n=lx=bbitcount|=ly", "<-","Reverse bits");
 
-	declnotune(PulseCodeModulationBlock, "=icode=bbitcount=uone=uzero|=uout", "PCM", "Pulse code modulation");
-	declnotune(PulseCountModulationBlock,"=icode=useq|=uout", "P#M", "Pulse count modulation");
-	declnotune(PulseLengthModulationBlock,"=icode=ireference=?space first=?significant first=?const syncro|=uout", "PLM", "Pulse width modulation");
+	declnotune(PulseCodeModulationBlock, "=n=icode=bbitcount=uone=uzero|=uout", "PCM", "Pulse code modulation");
+	declnotune(PulseCountModulationBlock,"=n=icode=useq|=uout", "P#M", "Pulse count modulation");
+	declnotune(PulseLengthModulationBlock,"=n=icode=ireference=?space first=?significant first=?const syncro|=uout", "PLM", "Pulse width modulation");
 
 	const Block* block_factory[] = {
 		&AddArithmeticBlock,
@@ -164,7 +179,7 @@ namespace u
 		ret->core = block_factory[factory_index];
 		if(!ret)
 			return NULL;
-		if (!ret->setup_ports()) {
+		if (!setup_ports(ret)) {
 			delete ret;
 			return NULL;
 		}
