@@ -74,13 +74,13 @@ namespace u {
 			if (sscanf(w, "%d", &i1) < 0)
 				cout << "Error\n";
 			else
-				cout << block_factory[i1].name << " " << block_factory[i1].description << endl;
+				cout << block_factory[i1]->name << " " << block_factory[i1]->description << endl;
 		}
 		else if (strstr(s, "list")) {
 			cout << "-----------------\n";
 			for (auto i : *g->nodes) {
-				cout << "  Node" << i->ports_cfg() << " {" << i;
-				cout << "} " << block_factory[i->factory_index].name << " [" << block_factory[i->factory_index].description;
+				cout << "  Node" << i->core->ports_cfg << " {" << i;
+				cout << "} " << i->core->name << " [" << i->core->description;
 				cout << "] Linked to " << i->next << endl;
 				int inputs = i->inputs;
 				for (int j = 0; j < inputs; j++) {

@@ -3,13 +3,29 @@
 #include "unicorn_library.h"
 
 #ifndef UNICORN_CFG_BLOCK_DESCRIPTIONS
-#error "UNICORN_CFG_BLOCK_DESCRIPTIONS not defined"
+	#error "UNICORN_CFG_BLOCK_DESCRIPTIONS not defined"
 #endif
 #if UNICORN_CFG_BLOCK_DESCRIPTIONS == 1
-#define __DECBLOCK(cls,name,desc) { ([]() -> Block* {return new (cls)();}), name, desc},
+
+	#define declblock(cls,tune,pcfg,name,desc) \
+		static const Block cls = \
+		{work_##cls,tune_##cls,pcfg,name,desc}
+		
+	#define declnotune(cls,pcfg,name,desc) \
+		static const Block cls = \
+		{work_##cls,nullptr,pcfg,name,desc}
+	
 #elif UNICORN_CFG_BLOCK_DESCRIPTIONS == 0
-#define __DECBLOCK(cls,name,desc) { ([]() -> Block* {return new (cls)();}), name},
-#else 
+
+	#define declblock(cls,work,tune,pcfg,name,desc) \
+		static const Block cls = \
+		{work_##cls,tune_##cls,pcfg,name}
+		
+	#define declnotune(cls,pcfg,name,desc) \
+		static const Block cls = \
+		{work_##cls,nullptr,pcfg,name}
+
+#else
 #error "Wrong UNICORN_CFG_BLOCK_DESCRIPTIONS parameter"
 #endif
 
@@ -22,6 +38,7 @@
 #error "Wrong UNICORN_CFG_ARM_SPECIFIC_CODE parameter"
 #endif
 
+#define __workfunction(cls) void work_##cls(port** portlist)
 
 #define _pl_bool(n) (*((bool*)portlist[n]))
 #define _pl_c(n) (*((char*)portlist[n]))
@@ -36,23 +53,28 @@
 
 namespace u
 {
-	void AddAriphmeticBlock::work() {
+	__workfunction(AddArithmeticBlock){
 		_pl_i(2) = _pl_i(0) + _pl_i(1);
 	}
-	void SubAriphmeticBlock::work() {
+	__workfunction(SubArithmeticBlock)
+	{
 		_pl_i(2) = _pl_i(0) - _pl_i(1);
 	}
-	void MulAriphmeticBlock::work() {
+	__workfunction(MulArithmeticBlock)
+	{
 		_pl_i(2) = _pl_i(0) * _pl_i(1);
 	}
-	void UMulAriphmeticBlock::work() {
+	__workfunction(UMulArithmeticBlock)
+	{
 		_pl_i(2) = ((unsigned)_pl_i(0) * (unsigned)_pl_i(1));
 	}
-	void DivAriphmeticBlock::work() {
+	__workfunction(DivArithmeticBlock)
+	{
 		_pl_i(2) = _pl_i(0) / _pl_i(1);
 	}
 
-	void ReverseBitsBlock::work() {
+	__workfunction(ReverseBitsBlock)
+	{
 		uint32_t x = _pl_i(0);
 		uint8_t bit_count = _pl_b(1);
 #if UNICORN_CFG_ARM_SPECIFIC_CODE == 1
@@ -69,7 +91,8 @@ namespace u
 		_pl_i(2) = x;
 	}
 
-	void PulseCodeModulationBlock::work() {
+	__workfunction(PulseCodeModulationBlock)
+	{
 		int32_t code = _pl_i(0);
 		uint8_t _bit_count = _pl_b(1);
 		uniseq *_sone = _pl_u(2);
@@ -85,14 +108,16 @@ namespace u
 		}
 	}
 
-	void PulseCountModulationBlock::work() {
+	__workfunction(PulseCountModulationBlock)
+	{
 		int32_t code = _pl_i(0);
 		for (; code > 0; code--) {
 			uniseq_copy(_pl_u(2), _pl_u(1));
 		}
 	}
 
-	void PulseLengthModulationBlock::work() {
+	__workfunction(PulseLengthModulationBlock)
+	{
 		int32_t code = _pl_i(0);
 		int32_t reference = _pl_i(1);
 		bool spacefirst = _pl_bool(2);
@@ -107,23 +132,36 @@ namespace u
 			uniseq_add_value(significantfirst ? nonsignificant : code, out, spacefirst ? true : false);
 		}
 	}
+	
+	
+	static const char* ports_ArithmeticBlock = "=l=l|=l";
+	declnotune(AddArithmeticBlock, ports_ArithmeticBlock, "+", "Add");
+	declnotune(SubArithmeticBlock, ports_ArithmeticBlock, "-", "Subtract");
+	declnotune(MulArithmeticBlock, ports_ArithmeticBlock, "*", "Signed Multiply");
+	declnotune(UMulArithmeticBlock,ports_ArithmeticBlock,"<*>","Uns<igned Multiply");
+	declnotune(DivArithmeticBlock, ports_ArithmeticBlock, "/", "Divide");
 
-	const BlockFactory block_factory[] = {
-		__DECBLOCK(Block, "", "Empty block")
-		__DECBLOCK(AddAriphmeticBlock, "+", "Add")
-		__DECBLOCK(SubAriphmeticBlock, "-", "Subtract")
-		__DECBLOCK(MulAriphmeticBlock, "*", "Signed Multiply")
-		__DECBLOCK(UMulAriphmeticBlock, "<*>", "Unsigned Multiply")
-		__DECBLOCK(DivAriphmeticBlock, "/", "Divide")
-		__DECBLOCK(ReverseBitsBlock, "<-", "Reverse bits")
-		__DECBLOCK(PulseCodeModulationBlock, "PCM", "Pulse code modulation")
-		__DECBLOCK(PulseCountModulationBlock, "P#M", "Pulse count modulation")
-		__DECBLOCK(PulseLengthModulationBlock, "PLM", "Pulse width modulation")
+	declnotune(ReverseBitsBlock,"=lx=bbitcount|=ly", "<-","Reverse bits");
+
+	declnotune(PulseCodeModulationBlock, "=icode=bbitcount=uone=uzero|=uout", "PCM", "Pulse code modulation");
+	declnotune(PulseCountModulationBlock,"=icode=useq|=uout", "P#M", "Pulse count modulation");
+	declnotune(PulseLengthModulationBlock,"=icode=ireference=?space first=?significant first=?const syncro|=uout", "PLM", "Pulse width modulation");
+
+	const Block* block_factory[] = {
+		&AddArithmeticBlock,
+		&SubArithmeticBlock,
+		&MulArithmeticBlock,
+		&UMulArithmeticBlock,
+		&DivArithmeticBlock,
+		&ReverseBitsBlock,
+		&PulseCodeModulationBlock,
+		&PulseCountModulationBlock,
+		&PulseLengthModulationBlock,
 	};
 
-	Block* new_std_block(int factory_index) {
-		Block* ret = block_factory[factory_index].construct();
-		ret->factory_index = factory_index;
+	Node* new_std_node(int factory_index) {
+		Node* ret = (Node*)U_MALLOC(sizeof(Node));
+		ret->core = block_factory[factory_index];
 		if(!ret)
 			return NULL;
 		if (!ret->setup_ports()) {

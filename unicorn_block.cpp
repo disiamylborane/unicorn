@@ -4,19 +4,19 @@
 
 namespace u
 {
-	size_t _align(size_t outs_length, uint8_t size) {
+	static size_t _align(size_t outs_length, uint8_t size) {
 		uint8_t __align = outs_length % size;
 		if (__align)
 			outs_length += size - __align;
 		return outs_length;
 	}
-	uint8_t _psym_size(char psym) {
+	static uint8_t _psym_size(char psym) {
 		return get_type_size(psym);
 	}
 
-	bool Block::setup_ports() {
+	bool Node::setup_ports() {
 		uint8_t *_write = &inputs;
-		for (const char*c = ports_cfg(); *c; c++) {
+		for (const char*c = core->ports_cfg; *c; c++) {
 			if (*c == UNICORN_CFG_BLOCK_DECOUPLER) {
 				_write = &outputs;
 			}
@@ -65,7 +65,7 @@ namespace u
 		return true;
 	}
 
-	void Block::destroy_ports() {
+	void Node::destroy_ports() {
 		port** outlist = &portlist[inputs];
 		for (int i = 0; i < outputs; i++) {
 			char psym = get_port_symbol(i + inputs);
@@ -77,8 +77,8 @@ namespace u
 		U_FREE(portlist);
 	}
 
-	char Block::get_port_symbol(int index) {
-		for (const char*c = ports_cfg(); *c; c++) 
+	char Node::get_port_symbol(int index) {
+		for (const char*c = core->ports_cfg; *c; c++) 
 		{
 			if (*c == UNICORN_CFG_BLOCK_TYPEMARK) 
 			{
@@ -91,9 +91,9 @@ namespace u
 		return '\0';
 	}
 
-	void run_blocks(Block* start) {
+	void run_blocks(Node* start) {
 		while (start) {
-			start->work();
+			start->core->work(start->portlist);
 			start = start->next;
 		}
 	}
