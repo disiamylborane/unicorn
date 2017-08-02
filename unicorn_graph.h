@@ -29,9 +29,9 @@ namespace u {
 		void _add_stencil(uint16_t bout, uint8_t pout, uint16_t bin, uint8_t pin);
 		void _del_stencil(int index);
 		void _del_const(int index);
-		void _del_const_array(char sym, int index);
+		void _del_const_array(int index);
 		void *_add_const(size_t size);
-		void *_add_const_array(char sym);
+		uniseq *_add_const_array(uint8_t size, uniseq* copyfrom);
 
 	public:
 		Graph(int reserve_nodes = 16, int reserve_stencil = 32, int reserve_const = 16);
@@ -48,6 +48,7 @@ namespace u {
 		bool connect(int node1, int port1, int node2, int port2);
 		bool connect_const(int node, int port, void* data);
 		void disconnect(int node, int port);
+		void run(int index);
 	};
 
 	bool pspec_ui(Graph *g);

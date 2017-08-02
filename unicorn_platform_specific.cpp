@@ -3,6 +3,9 @@
 #include <string.h>
 #include "unicorn_graph.h"
 
+#ifdef _MSC_VER
+#define gets gets_s
+#endif
 
 namespace u {
 

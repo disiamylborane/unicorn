@@ -4,17 +4,22 @@
 
 namespace u
 {
-	static size_t _align(size_t outs_length, uint8_t size) {
+	static size_t _align(size_t outs_length, uint8_t size)
+	{
 		uint8_t __align = outs_length % size;
 		if (__align)
 			outs_length += size - __align;
 		return outs_length;
 	}
-	static uint8_t _psym_size(char psym) {
+	static uint8_t _psym_size(char psym)
+	{
 		return get_type_size(psym);
 	}
 
-	bool setup_ports(Node* node) {
+	bool setup_ports(Node* node)
+	{
+		node->inputs = 0;
+		node->outputs = 0;
 		uint8_t *_write = &node->inputs;
 		for (const char*c = node->core->ports_cfg; *c; c++) {
 			if (*c == UNICORN_CFG_BLOCK_DECOUPLER) {
@@ -28,14 +33,15 @@ namespace u
 		size_t outs_length = 0;
 		for (int i = 0; i < node->outputs; i++) {
 			char psym = get_port_symbol(node, i + node->inputs);
-			if (is_array_type(psym))
-				continue;
-			uint8_t _size = _psym_size(psym);
-			if (!_size) {
-				return false;
+			uint8_t _size;
+			if (!is_array_type(psym)){
+				_size = _psym_size(psym);
+				if (!_size) {
+					return false;
+				}
+				outs_length = _align(outs_length, _size);
+				outs_length += _size;
 			}
-			outs_length = _align(outs_length, _size);
-			outs_length += _size;
 		}
 
 		size_t whole_ports_size = sizeof(void*)*(node->ports)+outs_length;
@@ -49,8 +55,8 @@ namespace u
 		for (int i = 0; i < node->outputs; i++) {
 			char psym = get_port_symbol(node, i + node->inputs);
 			if (is_array_type(psym)) {
-				void* _new_arr = new_array_type(psym);
-				if (!_new_arr)
+				uniseq* _new_arr = new uniseq(get_arr_size(psym), UNICORN_CFG_uniseq_BLOCK_RESERVE);
+				if(!_new_arr)
 					return false;
 				outlist[i] = _new_arr;
 			}
@@ -65,30 +71,65 @@ namespace u
 		return true;
 	}
 
-	void destroy_ports(Node* node) {
+	void destroy_ports(Node* node)
+	{
 		port** outlist = &node->portlist[node->inputs];
 		for (int i = 0; i < node->outputs; i++) {
 			char psym = get_port_symbol(node, i + node->inputs);
 			if (is_array_type(psym)) {
-				if(outlist[i])
-					delete_array_type(psym, outlist[i]);
+				delete (uniseq*)outlist[i];
 			}
 		}
 		U_FREE(node->portlist);
 	}
-
-	char get_port_symbol(Node* node, int index) {
+	
+	static const char* _search_symbol(Node* node, int port)
+	{
 		for (const char*c = node->core->ports_cfg; *c; c++) 
 		{
 			if (*c == UNICORN_CFG_BLOCK_TYPEMARK) 
 			{
-				if (index == 0){
-					return c[1];
+				if (port == 0){
+					return c+1;
 				}
-				else index--;
+				else port--;
 			}
 		}
-		return '\0';
+		return nullptr;
+	}
+	
+	char get_port_symbol(Node* node, int port)
+	{
+		const char* s = _search_symbol(node, port);
+		if(!s)
+			return '\0';
+		return *s;
+	}
+	
+	const char* get_port_name_pointer(Node* node, int port)
+	{
+		const char* s = _search_symbol(node, port);
+		if(!s)
+			return nullptr;
+		return &s[1];
+	}
+	
+	Node* new_node(const Block* bl)
+	{
+		Node* ret = (Node*)U_MALLOC(sizeof(Node));
+		if(!ret)
+			return nullptr;
+		ret->core = bl;
+		if (!setup_ports(ret)) {
+			U_FREE(ret);
+			return nullptr;
+		}
+		return ret;
+	}
+	
+	void free_node(Node* nd){
+		destroy_ports(nd);
+		free(nd);
 	}
 
 	void run_blocks(Node* start) {

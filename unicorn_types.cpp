@@ -1,4 +1,5 @@
-
+#include <ctype.h>
+#include <string.h>
 #include "unicorn_types.h"
 #include "unicorn_block.h"
 
@@ -28,10 +29,10 @@ namespace u
 		__DECLARE_UNICORN_TYPE('n', sizeof(type::n), "Node")
 	};
 
-	TypeDescriptor arrays[] = {
+	/*TypeDescriptor arrays[] = {
 		__DECLARE_UNICORN_TYPE('s', sizeof(type::s), "String")
 		__DECLARE_UNICORN_TYPE('u', sizeof(type::u), "Uniseq")
-	};
+	};*/
 
 	uint8_t get_type_size(char symbol)
 	{
@@ -41,74 +42,159 @@ namespace u
 		}
 		return 0;
 	}
+	
+	uint8_t get_arr_size(char symbol)
+	{
+		if((symbol>'Z') || (symbol<'A'))
+			return 0;
+		return get_type_size(tolower(symbol));
+	}
 
 	bool is_array_type(char symbol) {
-		for (auto i : arrays) {
-			if (i.symbol == symbol)
+		for (auto i : types) {
+			if (toupper(i.symbol) == symbol)
 				return true;
 		}
 		return false;
 	}
 
-	void* new_array_type(char symbol) {
-		switch (symbol) {
-		case 'u': {
-			uniseq *ret = new uniseq;
-			ret->reserve(UNICORN_CFG_UNISEQ_INITIAL_RESERVE);
-			return ret;
-		}
-		default:
-			return 0;
-		}
-	}
-
-	void delete_array_type(char symbol, void* arr) {
-		switch (symbol) {
-		case 'u':
-			delete (uniseq*)arr;
-			return;
-		default:
-			return;
-		}
-	}
-
-	void uniseq_add_value(unidata time, uniseq *out, bool addPulse) {
-		unidata _len = out->size();
-		bool _nowPulse = _len % 2 == 0;
-
+	void uniseq_timing_add_value(type::i time, uniseq *out, bool addPulse) {
 		if (time == 0)
 			return;
 
+		type::i _len = out->size;
+		bool _nowPulse = _len % 2;
+
 		if (_len == 0) {
 			if (!addPulse)
-				out->push_back(0);
-			out->push_back(time);
+				out->push_back_32(0);
+			out->push_back_32(time);
 			return;
 		}
 
 		if (_nowPulse == addPulse)
-			out->back() += time;
+			*((type::i*)out->back()) += time;
 		else 
-			out->push_back(time);
+			out->push_back_32(time);
 	}
 
-	void uniseq_copy(uniseq *out, uniseq *in) {
-		int _len = in->size();
+	void uniseq_timing_copy(uniseq *out, uniseq *in) {
+		int _len = in->size;
 		if (_len == 0)
 			return;
 
 		int _addindex = 0;
-		if ((*in)[0]) {
-			if(_len==1)
+		if (((type::i*)in->begin)[0] == 0) {
+			if (_len == 1)
 				return;
 			_addindex = 1;
 		}
-		uniseq_add_value((*in)[_addindex], out, _addindex);
+		uniseq_timing_add_value(((type::i*)in->begin)[_addindex], out, !_addindex);
 
-		for (;_addindex < _len; _addindex++) {
-			out->push_back((*in)[_addindex]);
-		}
+		out->append(in, _addindex+1);
 	}
 
+	uniseq::uniseq(uint8_t element_size, uint16_t initial_capacity)
+	{
+		elsize = element_size;
+		size = 0;
+		capacity = 0;
 
+		if(initial_capacity == 0){
+			begin = nullptr;
+			return;
+		}
+		
+		reserve(initial_capacity);
+	}
+	uniseq::~uniseq()
+	{
+		U_ARRAY_FREE(begin);
+		memset(this, 0, sizeof(uniseq));
+	}
+	void uniseq::reserve(uint16_t newcap)
+	{
+		if(newcap > capacity)
+		{
+			if(capacity)
+				begin = U_ARRAY_REALLOC(begin, newcap*elsize);
+			else
+				begin = U_ARRAY_MALLOC(newcap*elsize);
+		}
+		capacity = newcap;
+	}
+
+	void uniseq::tune_capacity()
+	{
+		if(!capacity)
+			reserve(UNICORN_CFG_uniseq_INITIAL_RESERVE);
+		if(size >= capacity){
+			reserve(capacity<<1);
+		}
+	}
+	void uniseq::push_back_8(int8_t element)
+	{
+		tune_capacity();
+		((int8_t*)begin)[size] = element;
+		size++;
+	}
+	void uniseq::push_back_16(int16_t element)
+	{
+		tune_capacity();
+		((int16_t*)begin)[size] = element;
+		size++;
+	}
+	void uniseq::push_back_32(int32_t element)
+	{
+		tune_capacity();
+		((int32_t*)begin)[size] = element;
+		size++;
+	}
+	void uniseq::push_back_64(int64_t element)
+	{
+		tune_capacity();
+		((int64_t*)begin)[size] = element;
+		size++;
+	}
+	void uniseq::push_back(void* ptr)
+	{
+		tune_capacity();
+		memcpy((void*)(((size_t)begin) + elsize * size), ptr, elsize);
+	}
+	void uniseq::remove(uint16_t index)
+	{
+		size_t curr = (size_t)begin + elsize*index;
+		size_t next = curr + elsize;
+		memmove((void*)curr,(void*)next,elsize*(size-index));
+		
+		size--;
+	}
+	void uniseq::clear()
+	{
+		size=0;
+	}
+	void* uniseq::at(uint16_t index)
+	{
+		return (void*) ((size_t)begin + elsize*index);
+	}
+	void* uniseq::back()
+	{
+		return (void*) ((size_t)begin + elsize*(size-1));
+	}
+	bool uniseq::append(const uniseq* val, uint16_t from)
+	{
+		if(val->elsize != elsize)
+			return false;
+		if(val->size < from)
+			return false;
+		
+		int16_t adding = val->size - from;
+		reserve(adding + size);
+		size_t ending = (size_t)begin + elsize*size;
+		size_t beginning = (size_t)val->begin + elsize*from;
+		memcpy((void*)ending, (void*)beginning, elsize*adding);
+		
+		size += adding;
+		return true;
+	}
 }

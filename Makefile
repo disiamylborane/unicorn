@@ -1,5 +1,5 @@
 
-CCFLAGS = -std=gnu++11 -Wall
+CCFLAGS = -std=gnu++11 -Wall -g
 CC=g++ $(CCFLAGS)
 LD=g++
 

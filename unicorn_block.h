@@ -39,10 +39,14 @@ namespace u
 		const Block *core;
 	};
 	
-	char get_port_symbol(Node* node, int index);
 	bool setup_ports(Node* node);
 	void destroy_ports(Node* node);
+	
+	char get_port_symbol(Node* node, int port);
+	const char* get_port_name_pointer(Node* node, int port);
 
+	Node* new_node(const Block* bl);
+	void free_node(Node* nd);
 	void run_blocks(Node* start);
 }
 

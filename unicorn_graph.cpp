@@ -36,8 +36,9 @@ namespace u {
 		const_buffer->push_back(ret);
 		return ret;
 	}
-	void *Graph::_add_const_array(char sym) {
-		void *arr = new_array_type(sym);
+	uniseq *Graph::_add_const_array(uint8_t size, uniseq* copyfrom) {
+		uniseq *arr = new uniseq(size, copyfrom->size);
+		arr->append(copyfrom,0);
 		const_buffer->push_back(arr);
 		return arr;
 	}
@@ -45,8 +46,8 @@ namespace u {
 		U_FREE((*const_buffer)[index]);
 		const_buffer->erase(const_buffer->begin() + index);
 	}
-	void Graph::_del_const_array(char sym, int index) {
-		delete_array_type(sym,(*const_buffer)[index]);
+	void Graph::_del_const_array(int index) {
+		delete (uniseq*)(*const_buffer)[index];
 		const_buffer->erase(const_buffer->begin() + index);
 	}
 
@@ -134,7 +135,7 @@ namespace u {
 					(*nodes)[node]->portlist[port] = 0;
 					char tsym = get_port_symbol((*nodes)[node],port);
 					if (is_array_type(tsym))
-						_del_const_array(tsym, i);
+						_del_const_array(i);
 					else
 						_del_const(i);
 					return;
@@ -158,19 +159,25 @@ namespace u {
 		if ((*nodes)[node]->inputs <= port)
 			return false;
 
-		void *newconst;
-		size_t size;
 		char sym = get_port_symbol((*nodes)[node],port);
-		if (is_array_type(sym))
-			newconst = _add_const_array(sym);
+		if (is_array_type(sym)){
+			uniseq* fill = (uniseq*)data;
+			uniseq* newconst = _add_const_array(get_arr_size(sym), fill);
+			(*nodes)[node]->portlist[port] = newconst;
+		}
 		else {
+			void *newconst;
+			size_t size;
 			size = get_type_size(sym);
 			newconst = _add_const(size);
+			(*nodes)[node]->portlist[port] = newconst;
+			memcpy(newconst, data, size);
 		}
 
-		(*nodes)[node]->portlist[port] = newconst;
-		memcpy(newconst, data, size);
 		return true;
 	}
-
+	void Graph::run(int index)
+	{
+		run_blocks((*nodes)[index]);
+	}
 }
