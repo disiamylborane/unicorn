@@ -13,16 +13,11 @@
 #endif
 
 namespace u
-{
-	struct Node;
-	namespace type {
-		typedef struct Node n;
-	}
-	
+{	
 	struct Block
 	{
 		type::n* (*work)(port** portlist);
-		void (*tune)();
+		const char* (*tune)(port** portlist);
 		const char* ports_cfg;
 		const char* name;
 #if UNICORN_CFG_BLOCK_DESCRIPTIONS == 1
@@ -34,14 +29,16 @@ namespace u
 	{
 		port **portlist;
 		int16_t xpos, ypos;
-		uint8_t inputs, outputs, ports, reserved;
+		uint8_t frees, ports, reserved0, reserved1;
 		
 		const Block *core;
 	};
 	
+	
 	bool setup_ports(Node* node);
 	void destroy_ports(Node* node);
-	
+
+	char get_port_type(Node* node, int port);
 	char get_port_symbol(Node* node, int port);
 	const char* get_port_name_pointer(Node* node, int port);
 

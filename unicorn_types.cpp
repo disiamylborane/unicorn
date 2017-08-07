@@ -16,23 +16,17 @@
 
 namespace u
 {
-
-	TypeDescriptor types[] = {
-		__DECLARE_UNICORN_TYPE('q', sizeof(type::q), "Bool")
-		__DECLARE_UNICORN_TYPE('c', sizeof(type::c), "Char")
-		__DECLARE_UNICORN_TYPE('b', sizeof(type::b), "Byte")
-		__DECLARE_UNICORN_TYPE('h', sizeof(type::h), "Short")
-		__DECLARE_UNICORN_TYPE('i', sizeof(type::i), "Int")
-		__DECLARE_UNICORN_TYPE('l', sizeof(type::l), "Long Long")
-		__DECLARE_UNICORN_TYPE('f', sizeof(type::f), "Float")
-		__DECLARE_UNICORN_TYPE('d', sizeof(type::d), "Double")
-		__DECLARE_UNICORN_TYPE('n', sizeof(type::n), "Node")
+	const TypeDescriptor types[] = {
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(q), sizeof(type::q), "Bool")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(c), sizeof(type::c), "Char")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(b), sizeof(type::b), "Byte")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(h), sizeof(type::h), "Short")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(i), sizeof(type::i), "Long")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(l), sizeof(type::l), "Long Long")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(f), sizeof(type::f), "Float")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(d), sizeof(type::d), "Double")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(n), sizeof(type::n), "Node")
 	};
-
-	/*TypeDescriptor arrays[] = {
-		__DECLARE_UNICORN_TYPE('s', sizeof(type::s), "String")
-		__DECLARE_UNICORN_TYPE('u', sizeof(type::u), "Uniseq")
-	};*/
 
 	uint8_t get_type_size(char symbol)
 	{
@@ -42,17 +36,29 @@ namespace u
 		}
 		return 0;
 	}
+
+	const char* get_type_description(char symbol)
+	{
+		for (auto i : types) {
+			if (i.symbol == symbol)
+				return i.description;
+		}
+		return 0;
+	}
 	
 	uint8_t get_arr_size(char symbol)
 	{
-		if((symbol>'Z') || (symbol<'A'))
+		if(!(symbol & 0x40))
 			return 0;
-		return get_type_size(tolower(symbol));
+		return get_type_size(symbol & (~0x40));
 	}
 
 	bool is_array_type(char symbol) {
+		if (!(symbol & 0x40))
+			return false;
+		char checking = symbol & (~0x40);
 		for (auto i : types) {
-			if (toupper(i.symbol) == symbol)
+			if (i.symbol == checking)
 				return true;
 		}
 		return false;
@@ -104,7 +110,7 @@ namespace u
 			begin = nullptr;
 			return;
 		}
-		
+
 		reserve(initial_capacity);
 	}
 	uniseq::~uniseq()
@@ -160,6 +166,7 @@ namespace u
 	{
 		tune_capacity();
 		memcpy((void*)(((size_t)begin) + elsize * size), ptr, elsize);
+		size++;
 	}
 	void uniseq::remove(uint16_t index)
 	{

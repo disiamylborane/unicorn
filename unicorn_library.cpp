@@ -7,13 +7,21 @@
 #endif
 #if UNICORN_CFG_BLOCK_DESCRIPTIONS == 1
 
-    #define declblock(cls,tune,pcfg,name,desc) \
+    #define declblock(cls,name,desc,pcfg) \
         static const Block cls = \
         {work_##cls,tune_##cls,pcfg,name,desc}
         
-    #define declnotune(cls,pcfg,name,desc) \
+    #define declnotune(cls,name,desc,pcfg) \
         static const Block cls = \
-        {work_##cls,nullptr,pcfg,name,desc}
+        {work_##cls,tune_Dummy,pcfg,name,desc}
+
+	#define declnowork(cls,name,desc,pcfg) \
+        static const Block cls = \
+        {work_Dummy,tune_##cls,pcfg,name,desc}
+
+	#define declconst(cls,name,desc,pcfg) \
+        static const Block cls = \
+        {work_Dummy,tune_Dummy,pcfg,name,desc}
     
 #elif UNICORN_CFG_BLOCK_DESCRIPTIONS == 0
 
@@ -38,28 +46,33 @@
 #error "Wrong UNICORN_CFG_ARM_SPECIFIC_CODE parameter"
 #endif
 
+#define in(type,name)  "\x7F" UTYPE_##type #name
+#define ref(type,name) "\x7F" UTYPE_RENDER_##type #name
+#define out(type,name)  "\xFF" UTYPE_##type #name
+#define param(type,name) "\xFF" UTYPE_RENDER_##type #name
+
+#define in_(type)  "\x7F" UTYPE_##type
+#define ref_(type) "\x7F" UTYPE_RENDER_##type
+#define out_(type)  "\xFF" UTYPE_##type
+#define param_(type) "\xFF" UTYPE_RENDER_##type
+
+
 #define __workfunction(cls) type::n* work_##cls(port** portlist)
+#define __tunefunction(cls) const char* tune_##cls(port** portlist)
 
 #define _pl_var(_type, _port) (*((type::_type*)portlist[_port]))
 #define _pl_arr(_port) ((uniseq*)portlist[_port])
 #define _pl_callnext(_port) return &_pl_var(n, _port)
 
-
-/*
-#define _pl_bool(n) (*((bool*)portlist[n]))
-#define _pl_c(n) (*((char*)portlist[n]))
-#define _pl_b(n) (*((uint8_t*)portlist[n]))
-#define _pl_h(n) (*((int16_t*)portlist[n]))
-#define _pl_i(n) (*((int32_t*)portlist[n]))
-#define _pl_l(n) (*((int64_t*)portlist[n]))
-#define _pl_f(n) (*((float*)portlist[n]))
-#define _pl_d(n) (*((double*)portlist[n]))
-#define _pl_u(n) (((uniseq*)portlist[n]))
-#define _pl_s(n) (((char*)portlist[n]))
-*/
-
 namespace u
 {
+	__workfunction(Dummy) {
+		return 0;
+	}
+	__tunefunction(Dummy) {
+		return 0;
+	}
+
     __workfunction(AddArithmeticBlock){
         _pl_var(i, 3) = _pl_var(i, 1) + _pl_var(i, 2);
         _pl_callnext(0);
@@ -192,32 +205,41 @@ namespace u
         _pl_callnext(0);
     }
     
-    static const char* ports_ArithmeticBlock = "=n=i=i|=i";
-    static const char* ports_ComparisonBlock = "=n=i=i|=q";
-    declnotune(AddArithmeticBlock, ports_ArithmeticBlock, "+", "Add");
-    declnotune(SubArithmeticBlock, ports_ArithmeticBlock, "-", "Subtract");
-    declnotune(MulArithmeticBlock, ports_ArithmeticBlock, "*", "Signed Multiply");
-    declnotune(UMulArithmeticBlock,ports_ArithmeticBlock,"<*>","Uns<igned Multiply");
-    declnotune(DivArithmeticBlock, ports_ArithmeticBlock, "/", "Divide");
+    static const char* ports_ArithmeticBlock = ref_(n) in_(i) in_(i) out_(i);
+    static const char* ports_ComparisonBlock = ref_(n) in_(i) in_(i) out_(q);
 
-    declnotune(ReverseBitsBlock,"=n=lx=bbitcount|=ly", "<-","Reverse bits");
+	declconst(IntVarBlock, "Int", "Int constant", param_(i));
 
-    declnotune(PulseCodeModulationBlock, "=n=icode=bbitcount=Ione=Izero|=Iout", "PCM", "Pulse code modulation");
-    declnotune(PulseCountModulationBlock,"=n=icode=Iseq|=Iout", "P#M", "Pulse count modulation");
-    declnotune(PulseLengthModulationBlock,"=n=icode=ireference=?space first=?significant first=?const syncro|=Iout", "PLM", "Pulse width modulation");
+    declnotune(AddArithmeticBlock, "+", "Add", ports_ArithmeticBlock);
+    declnotune(SubArithmeticBlock, "-", "Subtract", ports_ArithmeticBlock);
+    declnotune(MulArithmeticBlock, "*", "Signed Multiply", ports_ArithmeticBlock);
+    declnotune(UMulArithmeticBlock,"<*>","Uns<igned Multiply", ports_ArithmeticBlock);
+    declnotune(DivArithmeticBlock, "/", "Divide", ports_ArithmeticBlock);
 
-    declnotune(BranchBlock,"=ntrue=nfalse=q?", "if", "Branch");
-    declnotune(EqualBlock, ports_ComparisonBlock, "==", "Equal");
-    declnotune(NotEqualBlock, ports_ComparisonBlock, "!=", "Not equal");
-    declnotune(GreaterBlock, ports_ComparisonBlock, ">", "Greater");
-    declnotune(LesserBlock, ports_ComparisonBlock, "<", "Lesser");
-    declnotune(GreaterEqualBlock, ports_ComparisonBlock, ">=", "Greater or Equal");
-    declnotune(LesserEqualBlock, ports_ComparisonBlock, "<=", "Lesser or Equal");
+	declnotune(ReverseBitsBlock, "<-","Reverse bits",
+		ref_(n) in(i,x) in(b, bitcount) out(i,y));
+	declnotune(PulseCodeModulationBlock,"PCM", "Pulse code modulation",
+		ref_(n) in(i,code) in(b,bitcount) in(ARR_i,one) in(ARR_i,zero) out(ARR_i, out));
+    declnotune(PulseCountModulationBlock, "P#M", "Pulse count modulation",
+		ref_(n) in(i, code) in(ARR_i, seq) out(ARR_i, out));
+    declnotune(PulseLengthModulationBlock, "PLM", "Pulse width modulation",
+		ref_(n) in(i,code) in(i,reference) in(q,space first) in(q,significant first) in(q,const syncro) out(ARR_i,out));
 
+	declnotune(BranchBlock, "if", "Branch",
+		ref(n,true)ref(n,false)in_(q));
+
+	declnotune(EqualBlock, "==", "Equal", ports_ComparisonBlock);
+    declnotune(NotEqualBlock, "!=", "Not equal", ports_ComparisonBlock);
+    declnotune(GreaterBlock, ">", "Greater", ports_ComparisonBlock);
+    declnotune(LesserBlock, "<", "Lesser", ports_ComparisonBlock);
+    declnotune(GreaterEqualBlock, ">=", "Greater or Equal", ports_ComparisonBlock);
+    declnotune(LesserEqualBlock, "<=", "Lesser or Equal", ports_ComparisonBlock);
+	
     const Block* block_factory[] = {
+		&IntVarBlock,
         &AddArithmeticBlock,
-        &SubArithmeticBlock,
-        &MulArithmeticBlock,
+		&SubArithmeticBlock,
+		&MulArithmeticBlock,
         &UMulArithmeticBlock,
         &DivArithmeticBlock,
         &ReverseBitsBlock,
