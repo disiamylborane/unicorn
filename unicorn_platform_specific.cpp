@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <string.h>
+#include <inttypes.h>
 #include "unicorn_cfg.h"
 #include "unicorn_graph.h"
 
@@ -14,14 +15,102 @@ namespace u {
 
 	short curx, cury;
 
+	void cout_value(void* val, char type) {
+		switch (type) {
+		case UTYPE_q[0]:
+			cout << *(bool*)val;
+			break;
+		case UTYPE_c[0]:
+			cout << *(char*)val;
+			break;
+		case UTYPE_b[0]:
+			cout << (uint32_t)*(uint8_t*)val;
+			break;
+		case UTYPE_h[0]:
+			cout << *(int16_t*)val;
+			break;
+		case UTYPE_i[0]:
+			cout << *(int32_t*)val;
+			break;
+		case UTYPE_l[0]:
+			cout << *(int64_t*)val;
+			break;
+		case UTYPE_f[0]:
+			cout << *(float*)val;
+			break;
+		case UTYPE_d[0]:
+			cout << *(double*)val;
+			break;
+		case UTYPE_n[0]:
+			cout << (Node*)val;
+			break;
+		case UTYPE_t[0]:
+			cout << types[*(type::t*)val].description;
+			break;
+		default:
+			cout << "?";
+			break;
+		}
+	}
+	void* make_value(const char* s, char type) {
+		uint8_t sz = get_type_size(type);
+		if (!sz)
+			return nullptr;
+		void* val = malloc(sz);
+		switch (type) {
+		case UTYPE_q[0]:
+			*(bool*)val = atoi(s);
+			break;
+		case UTYPE_c[0]:
+			*(char*)val = atoi(s);
+			break;
+		case UTYPE_b[0]:
+			*(uint8_t*)val = atoi(s);
+			break;
+		case UTYPE_h[0]:
+			*(uint16_t*)val = atoi(s);
+			break;
+		case UTYPE_i[0]:
+			*(uint32_t*)val = atoi(s);
+			break;
+		case UTYPE_l[0]:
+			*(uint64_t*)val = atoi(s);
+			break;
+		case UTYPE_f[0]:
+			*(float*)val = atof(s);
+			break;
+		case UTYPE_d[0]:
+			*(double*)val = atof(s);
+			break;
+		default:
+			free(val);
+			return nullptr;
+		}
+		return val;
+	}
+
+	void print_port_name(const char* name)
+	{
+		while (*name && !(UNICORN_SYMBOL_IS_PORT(*name)))
+		{
+			cout << *name;
+			name++;
+		}
+	}
+
 	bool pspec_ui(Graph *g) {
 		gets(s);
 		curx = cury=0;
 
 		if (strstr(s, "add ")) {
 			w = &s[4];
-			int num = atoi(w);
-			g->add_std_node(num, curx, cury);
+			uintmax_t num = strtoumax(s, nullptr, 10);
+			if (num == UINTMAX_MAX && errno == ERANGE) {
+				cout << "Error\n";
+			}
+			else {
+				g->add_node(block_factory[num], curx, cury);
+			}
 		}
 		else if (strstr(s, "clear")) {
 			g->~Graph();
@@ -30,7 +119,7 @@ namespace u {
 		else if (strstr(s, "cur ")) {
 			int i1, i2;
 			w = &s[4];
-			if (sscanf(w, "%d %d", &i1, &i2) < 0)
+			if (sscanf(w, "%d %d", &i1, &i2) < 2)
 				cout << "Error\n";
 			else {
 				curx = i1;
@@ -40,7 +129,7 @@ namespace u {
 		else if (strstr(s, "lnk ")) {
 			int i1, i2, i3;
 			w = &s[4];
-			if (sscanf(w, "%d %d %d", &i1, &i2, &i3) < 0)
+			if (sscanf(w, "%d %d %d", &i1, &i2, &i3) < 3)
 				cout << "Error\n";
 			else {
 				g->link(i1, i2, i3);
@@ -49,7 +138,7 @@ namespace u {
 		else if (strstr(s, "cnt ")) {
 			int i1, i2, i3, i4;
 			w = &s[4];
-			if (sscanf(w, "%d %d %d %d", &i1, &i2, &i3, &i4) < 0)
+			if (sscanf(w, "%d %d %d %d", &i1, &i2, &i3, &i4) < 4)
 				cout << "Error\n";
 			else {
 				if(!g->connect(i1, i2, i3, i4))
@@ -57,42 +146,64 @@ namespace u {
 			}
 		}
 		else if (strstr(s, "set ")) {
-			int i1, i2, i3;
+			int i1, i2;
 			w = &s[4];
-			if (sscanf(w, "%d %d %d %d", &i1, &i2, &i3) < 0)
+			char __rest[1024];
+			char *rest = __rest;
+			if (sscanf(w, "%d %d %s", &i1, &i2, rest) < 3)
 				cout << "Error\n";
 			else {
 				Node* nd = ((Node**)g->nodes->begin)[i1];
-				if (get_port_type(nd, i2) == UNICORN_PORT_RIGID) {
-					memcpy(nd->portlist[i2], &i3, get_type_size(get_port_symbol(nd, i2)));
+				PortDefinition pd = node_port_get_definition(nd, i2);
+				if (node_port_get_location(pd) == pl_internal) {
+					char psym = node_port_get_datatype(pd);
+					if(is_array_type(psym))
+					{
+						uniseq* seq = ((uniseq*)nd->portlist[i2]);
+						seq->clear();
+						psym = get_arr_type(psym);
+						for (;;) {
+							if (!(*rest)) {
+								break;
+							}
+							void* val = make_value(rest, psym);
+							seq->push_back(val);
+							free(val);
+							do{
+								rest++;
+							} while ((rest[-1] != ',') && (*rest));
+						}
+					}
+					else {
+						void* val = make_value(rest, psym);
+						memcpy(nd->portlist[i2], val, get_type_size(psym));
+						free(val);
+					}
 				}
 			}
 		}
-		/*else if (strstr(s, "cst ")) {
-			int i1, i2, i3;
-			w = &s[4];
-			if (sscanf(w, "%d %d %d", &i1, &i2, &i3) < 0)
-				cout << "Error\n";
-			else {
-				if (!g->connect_const(i1, i2, &i3))
-					cout << "Can't const connect\n";
-			}
-		}*/
+		else if (strstr(s, "tune")) {
+			g->tune();
+		}
 		else if (strstr(s, "run ")) {
 			int i1;
 			w = &s[4];
-			if (sscanf(w, "%d", &i1) < 0)
+			if (sscanf(w, "%d", &i1) < 1)
 				cout << "Error\n";
 			else
 				run_blocks(((Node**)g->nodes->begin)[i1]);
 		}
-		else if (strstr(s, "chk ")) {
+		else if (strstr(s, "chk")) {
 			int i1;
-			w = &s[4];
-			if (sscanf(w, "%d", &i1) < 0)
-				cout << "Error\n";
-			else
+			w = &s[3];
+			if (sscanf(w, " %d", &i1) < 1) {
+				for (int i = 0; i < BLOCK_FACTORY_COUNT; i++) {
+					cout << i << ". [" << block_factory[i]->name << "] " << block_factory[i]->description << endl;
+				}
+			}
+			else {
 				cout << block_factory[i1]->name << " // " << block_factory[i1]->description << endl;
+			}
 		}
 		else if (strstr(s, "list")) {
 			cout << "\n-----------------\n";
@@ -105,47 +216,34 @@ namespace u {
 				cout << "]" << endl;
 				for (int j = 0; j < i->ports; j++) {
 					int* val = (int*)i->portlist[j];
-					if (get_port_type(i, j) == UNICORN_PORT_FREE)
-						cout << "    <-";
-					else  // UNICORN_PORT_RIGID
-						cout << "    []";
-					cout << j << "  {" << val << "}" ;
+					PortDefinition pd = node_port_get_definition(i, j);
+					if (node_port_get_location(pd) == pl_internal) {
+						if(node_port_get_direction(pd) == pd_output)
+							cout << "  []";
+						else
+							cout << "  **";
+					}
+					else {  // UNICORN_PORT_INTERNAL
+						if (node_port_get_direction(pd) == pd_output)
+							cout << "  <=";
+						else
+							cout << "  ->";
+					}
+					cout << j << "  {" << val << "} " ;
+					char psym = node_port_get_datatype(pd);
+					cout << get_type_description(psym) << ' ';
+					print_port_name(node_port_get_name(pd));
 					if (val) {
-						cout << "[";
-						char psym = get_port_symbol(i, j);
-						switch (psym) {
-						case UTYPE_q[0]:
-							cout << *(bool*)i->portlist[j];
-							break;
-						case UTYPE_c[0]:
-							cout << *(char*)i->portlist[j];
-							break;
-						case UTYPE_b[0]:
-							cout << (uint32_t) *(uint8_t*)i->portlist[j];
-							break;
-						case UTYPE_h[0]:
-							cout << *(uint16_t*)i->portlist[j];
-							break;
-						case UTYPE_i[0]:
-							cout << *(uint32_t*)i->portlist[j];
-							break;
-						case UTYPE_l[0]:
-							cout << *(uint64_t*)i->portlist[j];
-							break;
-						case UTYPE_f[0]:
-							cout << *(float*)i->portlist[j];
-							break;
-						case UTYPE_d[0]:
-							cout << *(double*)i->portlist[j];
-							break;
-						case UTYPE_n[0]:
-							cout << (Node*)i->portlist[j];
-							break;
-						default:
-							cout << "????????";
-							break;
+						cout << " [";
+						if (is_array_type(psym)) {
+							for (int k = 0; k < ((uniseq*)i->portlist[j])->size; k++) {
+								cout_value(((uniseq*)i->portlist[j])->at(k), psym&0x3F);
+								cout << ",";
+							}
 						}
-						cout << "] " << get_type_description(psym);
+						else
+							cout_value(i->portlist[j], psym);
+						cout << "]";
 					}
 					cout << endl;
 				}

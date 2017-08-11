@@ -15,11 +15,11 @@
         static const Block cls = \
         {work_##cls,tune_Dummy,pcfg,name,desc}
 
-	#define declnowork(cls,name,desc,pcfg) \
+    #define declnowork(cls,name,desc,pcfg) \
         static const Block cls = \
         {work_Dummy,tune_##cls,pcfg,name,desc}
 
-	#define declconst(cls,name,desc,pcfg) \
+    #define declconst(cls,name,desc,pcfg) \
         static const Block cls = \
         {work_Dummy,tune_Dummy,pcfg,name,desc}
     
@@ -47,14 +47,14 @@
 #endif
 
 #define in(type,name)  "\x7F" UTYPE_##type #name
-#define ref(type,name) "\x7F" UTYPE_RENDER_##type #name
+#define ref(type,name) "\x7F" UTYPE_DIR_##type #name
 #define out(type,name)  "\xFF" UTYPE_##type #name
-#define param(type,name) "\xFF" UTYPE_RENDER_##type #name
+#define param(type,name) "\xFF" UTYPE_DIR_##type #name
 
 #define in_(type)  "\x7F" UTYPE_##type
-#define ref_(type) "\x7F" UTYPE_RENDER_##type
+#define ref_(type) "\x7F" UTYPE_DIR_##type
 #define out_(type)  "\xFF" UTYPE_##type
-#define param_(type) "\xFF" UTYPE_RENDER_##type
+#define param_(type) "\xFF" UTYPE_DIR_##type
 
 
 #define __workfunction(cls) type::n* work_##cls(port** portlist)
@@ -66,12 +66,49 @@
 
 namespace u
 {
-	__workfunction(Dummy) {
-		return 0;
+	void uniseq_timing_add_value(type::i time, uniseq *out, bool addPulse)
+	{
+		if (time == 0)
+			return;
+
+		type::i _len = out->size;
+		bool _nowPulse = _len % 2;
+
+		if (_len == 0) {
+			if (!addPulse)
+				out->push_back_32(0);
+			out->push_back_32(time);
+			return;
+		}
+
+		if (_nowPulse == addPulse)
+			*((type::i*)out->back()) += time;
+		else
+			out->push_back_32(time);
 	}
-	__tunefunction(Dummy) {
-		return 0;
+	void uniseq_timing_copy(uniseq *out, uniseq *in) 
+	{
+		int _len = in->size;
+		if (_len == 0)
+			return;
+
+		int _addindex = 0;
+		if (((type::i*)in->begin)[0] == 0) {
+			if (_len == 1)
+				return;
+			_addindex = 1;
+		}
+		uniseq_timing_add_value(((type::i*)in->begin)[_addindex], out, !_addindex);
+
+		out->append(in, _addindex + 1);
 	}
+
+    __workfunction(Dummy) {
+        return 0;
+    }
+    __tunefunction(Dummy) {
+        return 0;
+    }
 
     __workfunction(AddArithmeticBlock){
         _pl_var(i, 3) = _pl_var(i, 1) + _pl_var(i, 2);
@@ -97,6 +134,16 @@ namespace u
         _pl_var(i, 3) = _pl_var(i, 1) / _pl_var(i, 2);
         _pl_callnext(0);
     }
+	__workfunction(ShiftRightBlock)
+	{
+		_pl_var(i, 3) = _pl_var(i, 1) >> _pl_var(i, 2);
+		_pl_callnext(0);
+	}
+	__workfunction(ShiftLeftBlock)
+	{
+		_pl_var(i, 3) = _pl_var(i, 1) << _pl_var(i, 2);
+		_pl_callnext(0);
+	}
 
     __workfunction(ReverseBitsBlock)
     {
@@ -204,44 +251,124 @@ namespace u
         _pl_var(q, 3) =  _pl_var(i, 1) <= _pl_var(i, 2);
         _pl_callnext(0);
     }
+
+
+    __tunefunction(CircularBlock) {
+        type::i size = _pl_var(i, 1);
+        uniseq* out = _pl_arr(3);
+
+        out->resize(size);
+        memset(out->begin, 0, sizeof(type::i)*size);
+
+        _pl_var(i, 4) = 0;
+
+        return nullptr;
+    }
+    __workfunction(CircularBlock) {
+        type::i size = _pl_var(i, 1);
+        type::i in = _pl_var(i, 2);
+        uniseq* out = _pl_arr(3);
+        type::i first = _pl_var(i, 4);
+
+        ((type::i*)out->begin)[first] = in;
+
+        first++;
+        if (first == size)
+            first = 0;
+
+        _pl_var(i, 4) = first;
+        _pl_callnext(0);
+    }
+
+    __workfunction(FIRBlock) {
+        uniseq* fifo = _pl_arr(1);
+        type::i first = _pl_var(i, 2);
+        uniseq* coeffs = _pl_arr(3);
+
+        _pl_arr(4);
+
+        int size1 = fifo->size;
+        int size2 = coeffs->size;
+        int size = (size1 < size2) ? size1 : size2;
+
+        type::i ret = 0;
+        for (type::i* i = ((type::i*)coeffs->begin)+size; i > (type::i*)coeffs->begin;) {
+            ret += *(--i) * ((type::i*)fifo->begin)[first++];
+            if (first == size)
+                first = 0;
+        }
+        _pl_var(i, 4) = ret;
+        _pl_callnext(0);
+    }
     
     static const char* ports_ArithmeticBlock = ref_(n) in_(i) in_(i) out_(i);
     static const char* ports_ComparisonBlock = ref_(n) in_(i) in_(i) out_(q);
 
-	declconst(IntVarBlock, "Int", "Int constant", param_(i));
+	declconst(BoolVarBlock, "Bool", "Bool variable", param_(q));
+	declconst(CharVarBlock, "Char", "Char variable", param_(c));
+	declconst(ByteVarBlock, "Byte", "Byte variable", param_(b));
+	declconst(ShortVarBlock, "Short", "Short variable", param_(h));
+	declconst(LongVarBlock, "Long", "Long variable", param_(i));
+	declconst(LongLongVarBlock, "Long Long", "64bit variable", param_(l));
+	declconst(FloatVarBlock, "Float", "Float variable", param_(f));
+	declconst(DoubleVarBlock, "Double", "Double variable", param_(d));
+	declconst(NodeVarBlock, "Node", "Node variable", param_(n));
+	declconst(TypeVarBlock, "Type", "Type variable", param_(t));
+
+    declconst(IntArrBlock, "Uniseq/int", "Int array constant", param_(ARR_i));
 
     declnotune(AddArithmeticBlock, "+", "Add", ports_ArithmeticBlock);
     declnotune(SubArithmeticBlock, "-", "Subtract", ports_ArithmeticBlock);
     declnotune(MulArithmeticBlock, "*", "Signed Multiply", ports_ArithmeticBlock);
-    declnotune(UMulArithmeticBlock,"<*>","Uns<igned Multiply", ports_ArithmeticBlock);
+    declnotune(UMulArithmeticBlock,"<*>","Unsigned Multiply", ports_ArithmeticBlock);
     declnotune(DivArithmeticBlock, "/", "Divide", ports_ArithmeticBlock);
+    declnotune(ShiftRightBlock, ">>", "Shift Right", ports_ArithmeticBlock);
+    declnotune(ShiftLeftBlock, "<<", "Shift Left", ports_ArithmeticBlock);
 
-	declnotune(ReverseBitsBlock, "<-","Reverse bits",
-		ref_(n) in(i,x) in(b, bitcount) out(i,y));
-	declnotune(PulseCodeModulationBlock,"PCM", "Pulse code modulation",
-		ref_(n) in(i,code) in(b,bitcount) in(ARR_i,one) in(ARR_i,zero) out(ARR_i, out));
+    declnotune(ReverseBitsBlock, "<-","Reverse bits",
+        ref_(n) in(i,x) in(b, bitcount) out(i,y));
+
+    declnotune(PulseCodeModulationBlock,"PCM", "Pulse code modulation",
+        ref_(n) in(i,code) in(b,bitcount) in(ARR_i,one) in(ARR_i,zero) out(ARR_i, out));
     declnotune(PulseCountModulationBlock, "P#M", "Pulse count modulation",
-		ref_(n) in(i, code) in(ARR_i, seq) out(ARR_i, out));
+        ref_(n) in(i, code) in(ARR_i, seq) out(ARR_i, out));
     declnotune(PulseLengthModulationBlock, "PLM", "Pulse width modulation",
-		ref_(n) in(i,code) in(i,reference) in(q,space first) in(q,significant first) in(q,const syncro) out(ARR_i,out));
+        ref_(n) in(i,code) in(i,reference) in(q,space first) in(q,significant first) in(q,const syncro) out(ARR_i,out));
 
-	declnotune(BranchBlock, "if", "Branch",
-		ref(n,true)ref(n,false)in_(q));
+    declnotune(BranchBlock, "if", "Branch",
+        ref(n,true)ref(n,false)in_(q));
 
-	declnotune(EqualBlock, "==", "Equal", ports_ComparisonBlock);
+    declnotune(EqualBlock, "==", "Equal", ports_ComparisonBlock);
     declnotune(NotEqualBlock, "!=", "Not equal", ports_ComparisonBlock);
     declnotune(GreaterBlock, ">", "Greater", ports_ComparisonBlock);
     declnotune(LesserBlock, "<", "Lesser", ports_ComparisonBlock);
     declnotune(GreaterEqualBlock, ">=", "Greater or Equal", ports_ComparisonBlock);
     declnotune(LesserEqualBlock, "<=", "Lesser or Equal", ports_ComparisonBlock);
-	
+
+    declblock(CircularBlock, "FIFO", "Circular FIFO of given size",
+        ref_(n) param(i, size) in(i, in) out(ARR_i, out) out(i, first));
+    declnotune(FIRBlock, "FIR", "FIR Filter working with Circular FIFO",
+        ref_(n) in(ARR_i, fifo) in(i, first) in(ARR_i, coeffs) out_(i));
+
     const Block* block_factory[] = {
-		&IntVarBlock,
+		&BoolVarBlock,
+		&CharVarBlock,
+		&ByteVarBlock,
+		&ShortVarBlock,
+		&LongVarBlock,
+		&LongLongVarBlock,
+		&FloatVarBlock,
+		&DoubleVarBlock,
+		&NodeVarBlock,
+		&TypeVarBlock,
+        &IntArrBlock,
         &AddArithmeticBlock,
-		&SubArithmeticBlock,
-		&MulArithmeticBlock,
+        &SubArithmeticBlock,
+        &MulArithmeticBlock,
         &UMulArithmeticBlock,
         &DivArithmeticBlock,
+		&ShiftRightBlock,
+		&ShiftLeftBlock,
         &ReverseBitsBlock,
         &PulseCodeModulationBlock,
         &PulseCountModulationBlock,
@@ -253,10 +380,8 @@ namespace u
         &LesserBlock,
         &GreaterEqualBlock,
         &LesserEqualBlock,
+        &CircularBlock,
+        &FIRBlock,
     };
-
-    Node* new_std_node(int factory_index) {
-        return new_node(block_factory[factory_index]);
-    }
 }
 

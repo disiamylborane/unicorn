@@ -26,6 +26,7 @@ namespace u
 		__DECLARE_UNICORN_TYPE(CHAR_TYPE(f), sizeof(type::f), "Float")
 		__DECLARE_UNICORN_TYPE(CHAR_TYPE(d), sizeof(type::d), "Double")
 		__DECLARE_UNICORN_TYPE(CHAR_TYPE(n), sizeof(type::n), "Node")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(t), sizeof(type::t), "Type")
 	};
 
 	uint8_t get_type_size(char symbol)
@@ -39,6 +40,8 @@ namespace u
 
 	const char* get_type_description(char symbol)
 	{
+		if (symbol & 0x40)
+			return "Array";
 		for (auto i : types) {
 			if (i.symbol == symbol)
 				return i.description;
@@ -62,42 +65,6 @@ namespace u
 				return true;
 		}
 		return false;
-	}
-
-	void uniseq_timing_add_value(type::i time, uniseq *out, bool addPulse) {
-		if (time == 0)
-			return;
-
-		type::i _len = out->size;
-		bool _nowPulse = _len % 2;
-
-		if (_len == 0) {
-			if (!addPulse)
-				out->push_back_32(0);
-			out->push_back_32(time);
-			return;
-		}
-
-		if (_nowPulse == addPulse)
-			*((type::i*)out->back()) += time;
-		else 
-			out->push_back_32(time);
-	}
-
-	void uniseq_timing_copy(uniseq *out, uniseq *in) {
-		int _len = in->size;
-		if (_len == 0)
-			return;
-
-		int _addindex = 0;
-		if (((type::i*)in->begin)[0] == 0) {
-			if (_len == 1)
-				return;
-			_addindex = 1;
-		}
-		uniseq_timing_add_value(((type::i*)in->begin)[_addindex], out, !_addindex);
-
-		out->append(in, _addindex+1);
 	}
 
 	uniseq::uniseq(uint8_t element_size, uint16_t initial_capacity)
@@ -129,7 +96,14 @@ namespace u
 		}
 		capacity = newcap;
 	}
-
+	void uniseq::resize(uint16_t newsize)
+	{
+		if (newsize > capacity) {
+			reserve(newsize);
+		}
+		memset((void*)(((size_t)begin) + elsize*size), 0, newsize- size);
+		size = newsize;
+	}
 	void uniseq::tune_capacity()
 	{
 		if(!capacity)

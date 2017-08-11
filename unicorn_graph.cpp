@@ -26,8 +26,8 @@ namespace u {
 		stencil_buffer->remove(index);
 	}
 
-	void Graph::add_std_node(int factory_index, int xpos, int ypos) {
-		Node* nd = new_std_node(factory_index);
+	void Graph::add_node(const Block* block, int xpos, int ypos) {
+		Node* nd = new_node(block);
 		nd->xpos = xpos;
 		nd->ypos = ypos;
 		nodes->push_back_pointer(nd);
@@ -58,9 +58,10 @@ namespace u {
 		((Node**)nodes->begin)[node]->ypos += deltay;
 	}
 
-	Graph::_port_type Graph::_get_port_type(int node, int port) {
+	PortLocation Graph::_get_port_location(int node, int port) {
 		Node* _working = ((Node**)nodes->begin)[node];
-		return get_port_type(_working, port);
+		PortDefinition pd = node_port_get_definition(_working, port);
+		return node_port_get_location(pd);
 	}
 
 	void Graph::link(int node, int port, int to) {
@@ -73,14 +74,14 @@ namespace u {
 	bool Graph::connect(int node1, int port1, int node2, int port2){
 		//The ports can be connected only <Free> to <Rigid>
 
-		_port_type _t1 = _get_port_type(node1, port1);
-		_port_type _t2 = _get_port_type(node2, port2);
+		PortLocation _t1 = _get_port_location(node1, port1);
+		PortLocation _t2 = _get_port_location(node2, port2);
 
-		if ((_t1 == UNICORN_PORT_ERROR) || (_t1 == UNICORN_PORT_ERROR) || (_t1 == _t2))
+		if ((_t1 == pl_error) || (_t1 == pl_error) || (_t1 == _t2))
 			return false;
 
 		int nodeI, nodeO, portI, portO;
-		if (_t1 == UNICORN_PORT_RIGID) {
+		if (_t1 == pl_internal) {
 			nodeI = node2;
 			nodeO = node1;
 			portI = port2;
@@ -112,6 +113,13 @@ namespace u {
 		}
 	}
 
+	void Graph::tune()
+	{
+		Node** begin = (Node**)nodes->begin;
+		for (Node **b = begin; b < &begin[nodes->size]; b++) {
+			(*b)->core->tune((*b)->portlist);
+		}
+	}
 	void Graph::run(int index)
 	{
 		run_blocks(((Node**)nodes->begin)[index]);

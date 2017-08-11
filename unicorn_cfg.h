@@ -59,9 +59,13 @@ Ports_cfg format:
 */
 
 #define UNICORN_PORT_ERROR '\0'
-#define UNICORN_PORT_FREE  '\x7F'
-#define UNICORN_PORT_RIGID '\xFF'
+#define UNICORN_PORT_EXTERNAL  '\x7F'
+#define UNICORN_PORT_INTERNAL '\xFF'
 
 #define UNICORN_SYMBOL_IS_PORT(c) ((c | (char)0x80) == (char)0xFF)
+
+#define UNICORN_SYMBOL_INTERNAL_MASK ((char)0x80)
+#define UNICORN_SYMBOL_OUTPUT_MASK ((char)0x80)
+
 
 #endif

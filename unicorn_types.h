@@ -15,6 +15,7 @@
 #define UTYPE_f "\x7"
 #define UTYPE_d "\x8"
 #define UTYPE_n "\x9"
+#define UTYPE_t "\xA"
 
 #define UTYPE_ARR_q "\x41"
 #define UTYPE_ARR_c "\x42"
@@ -25,26 +26,29 @@
 #define UTYPE_ARR_f "\x47"
 #define UTYPE_ARR_d "\x48"
 #define UTYPE_ARR_n "\x49"
+#define UTYPE_ARR_t "\x4A"
 
-#define UTYPE_RENDER_q "\x81"
-#define UTYPE_RENDER_c "\x82"
-#define UTYPE_RENDER_b "\x83"
-#define UTYPE_RENDER_h "\x84"
-#define UTYPE_RENDER_i "\x85"
-#define UTYPE_RENDER_l "\x86"
-#define UTYPE_RENDER_f "\x87"
-#define UTYPE_RENDER_d "\x88"
-#define UTYPE_RENDER_n "\x89"
+#define UTYPE_DIR_q "\x81"
+#define UTYPE_DIR_c "\x82"
+#define UTYPE_DIR_b "\x83"
+#define UTYPE_DIR_h "\x84"
+#define UTYPE_DIR_i "\x85"
+#define UTYPE_DIR_l "\x86"
+#define UTYPE_DIR_f "\x87"
+#define UTYPE_DIR_d "\x88"
+#define UTYPE_DIR_n "\x89"
+#define UTYPE_DIR_t "\x8A"
 
-#define UTYPE_ARR_RENDER_q "\xC1"
-#define UTYPE_ARR_RENDER_c "\xC2"
-#define UTYPE_ARR_RENDER_b "\xC3"
-#define UTYPE_ARR_RENDER_h "\xC4"
-#define UTYPE_ARR_RENDER_i "\xC5"
-#define UTYPE_ARR_RENDER_l "\xC6"
-#define UTYPE_ARR_RENDER_f "\xC7"
-#define UTYPE_ARR_RENDER_d "\xC8"
-#define UTYPE_ARR_RENDER_n "\xC9"
+#define UTYPE_DIR_ARR_q "\xC1"
+#define UTYPE_DIR_ARR_c "\xC2"
+#define UTYPE_DIR_ARR_b "\xC3"
+#define UTYPE_DIR_ARR_h "\xC4"
+#define UTYPE_DIR_ARR_i "\xC5"
+#define UTYPE_DIR_ARR_l "\xC6"
+#define UTYPE_DIR_ARR_f "\xC7"
+#define UTYPE_DIR_ARR_d "\xC8"
+#define UTYPE_DIR_ARR_n "\xC9"
+#define UTYPE_DIR_ARR_t "\xCA"
 
 #define CHAR_TYPE(x) UTYPE_##x[0]
 
@@ -52,6 +56,12 @@ namespace u
 {
 	typedef void port;
 
+	/*
+		Uniseq is the custom std::vector-like data structure
+		that covers the minimum needed for unicorn.
+		
+		<at> is overflow-unsafe
+	*/
 	class uniseq{
 	public:
 		void* begin;
@@ -60,6 +70,7 @@ namespace u
 		uniseq(uint8_t element_size, uint16_t initial_capacity);
 		~uniseq();
 		void reserve(uint16_t newcap);
+		void resize(uint16_t newsize);
 		
 		void push_back_8(int8_t element);
 		void push_back_16(int16_t element);
@@ -85,7 +96,6 @@ namespace u
 		
 	protected:
 		uint8_t elsize;
-		
 		void tune_capacity();
 	};
 
@@ -95,7 +105,7 @@ namespace u
 		The port configuration string one-letter type identifiers
 		are the same to the u::type:: identifiers.
 	*/
-	struct Node;
+	struct Node;  //extern
 	namespace type {
 		typedef bool    q;  /// Boolean port
 		typedef char    c;  /// ASCII symbol port
@@ -109,6 +119,8 @@ namespace u
 		typedef double  d;  /// Double precision float port
 
 		typedef Node n;
+
+		typedef char t;
 	}
 
 	struct TypeDescriptor {
@@ -118,11 +130,11 @@ namespace u
 		const char *description;
 #endif
 	};
-	
-	void uniseq_timing_add_value(type::i time, uniseq *out, bool addPulse);
-	void uniseq_timing_copy(uniseq *out, uniseq *in);
 
 	extern const TypeDescriptor types[];
+
+	inline char get_arr_type(char symbol)
+		{return symbol & 0x3F;};
 
 	uint8_t get_type_size(char symbol);
 	const char* get_type_description(char symbol);

@@ -15,17 +15,17 @@ namespace u
 	bool setup_ports(Node* node)
 	{
 		//Calculate how much memory is needed for all the rigid ports
-		//Also fill <ports> and <frees> fields of <node>
-		uint8_t frees = 0;
-		uint8_t rigids = 0;
+		//Also fill <ports> and <exts> fields of <node>
+		uint8_t exts = 0;
+		uint8_t ints = 0;
 		size_t memsize = 0;
 		for (const char *c = node->core->ports_cfg; *c; c++) {
 			char curr = *c;
-			if (curr == UNICORN_PORT_FREE) {
-				frees++;
+			if (curr == UNICORN_PORT_EXTERNAL) {
+				exts++;
 			}
-			else if (curr == UNICORN_PORT_RIGID) {
-				rigids++;
+			else if (curr == UNICORN_PORT_INTERNAL) {
+				ints++;
 				char ptype = c[1] & 0x7F;  // bit [7] render type , bits [6:0] data type
 				if (!is_array_type(ptype)) {
 					uint8_t _size = get_type_size(ptype);
@@ -36,8 +36,8 @@ namespace u
 				}
 			}
 		}
-		node->frees = frees;
-		uint8_t ports = frees + rigids;
+		node->frees = exts;
+		uint8_t ports = exts + ints;
 		node->ports = ports;
 		size_t whole_ports_size = sizeof(void*)*(node->ports) + memsize;
 
@@ -51,9 +51,9 @@ namespace u
 
 		void* curr_port_address = &portlist[ports];
 
-		//Now use the <portlist> pointer to fill in the rigid ports
+		//Use the <portlist> pointer to fill in internal ports
 		for (const char *c = node->core->ports_cfg; *c; c++) {
-			if (*c == UNICORN_PORT_RIGID) {
+			if (*c == UNICORN_PORT_INTERNAL) {
 				char ptype = c[1] & 0x7F;
 				if (is_array_type(ptype)) {
 					uniseq* _new_arr = new uniseq(get_arr_size(ptype), UNICORN_CFG_uniseq_BLOCK_RESERVE);
@@ -71,7 +71,7 @@ namespace u
 				}
 				portlist++;
 			}
-			else if (*c == UNICORN_PORT_FREE)
+			else //if (*c == UNICORN_PORT_EXTERNAL)
 				portlist++;
 		}
 		return true;
@@ -83,7 +83,7 @@ namespace u
 		port** portlist = node->portlist;
 		for (const char *c = node->core->ports_cfg; *c; c++){
 			if (UNICORN_SYMBOL_IS_PORT(*c)) {
-				if (*c == UNICORN_PORT_RIGID) {
+				if (*c == UNICORN_PORT_INTERNAL) {
 					char ptype = c[1] & 0x7F;
 					if (is_array_type(ptype)) {
 						uniseq* freeable = (uniseq*)*portlist;
@@ -96,14 +96,13 @@ namespace u
 		}
 		U_PORTS_FREE(node->portlist);
 	}
-	
-	static const char* _search_symbol(Node* node, int port)
-	{
-		for (const char*c = node->core->ports_cfg; *c; c++) 
+
+	PortDefinition node_port_get_definition(Node* node, int port) {
+		for (const char*c = node->core->ports_cfg; *c; c++)
 		{
-			if (UNICORN_SYMBOL_IS_PORT(*c)) 
+			if (UNICORN_SYMBOL_IS_PORT(*c))
 			{
-				if (port == 0){
+				if (port == 0) {
 					return c;
 				}
 				else port--;
@@ -112,28 +111,31 @@ namespace u
 		return nullptr;
 	}
 
-	char get_port_type(Node* node, int port)
+	PortLocation node_port_get_location(PortDefinition def)
 	{
-		const char* s = _search_symbol(node, port);
-		if (!s)
-			return '\0';
-		return *s;
+		if (!def)
+			return pl_error;
+		if ((def[0]) & UNICORN_SYMBOL_INTERNAL_MASK)
+			return pl_internal;
+		else
+			return pl_external;
+	}
+	PortDirection node_port_get_direction(PortDefinition def)
+	{
+		if ((def[1]) & UNICORN_SYMBOL_OUTPUT_MASK)
+			return pd_output;
+		else
+			return pd_input;
 	}
 
-	char get_port_symbol(Node* node, int port)
+	char node_port_get_datatype(PortDefinition def)
 	{
-		const char* s = _search_symbol(node, port);
-		if(!s)
-			return '\0';
-		return s[1] & 0x7F;
+		return (def[1] & 0x7F);
 	}
-	
-	const char* get_port_name_pointer(Node* node, int port)
+
+	const char* node_port_get_name(PortDefinition def)
 	{
-		const char* s = _search_symbol(node, port);
-		if(!s)
-			return nullptr;
-		return &s[2];
+		return &def[2];
 	}
 	
 	Node* new_node(const Block* bl)
