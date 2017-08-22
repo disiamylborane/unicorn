@@ -14,10 +14,16 @@
 
 namespace u
 {	
+	//btt_manual: manually called in user interface
+	//btt_loaded: the block is now loaded from file
+	//btt_saving: the block wil now be saved to file
+	//btt_begin: called by <Graph> before the work starts
+	typedef enum BlockTuneType {btt_manual, btt_loaded, btt_saving, btt_start, btt_stop} BlockTuneType;
+	
 	struct Block
 	{
 		type::n* (*work)(port** portlist);
-		const char* (*tune)(port** portlist);
+		const char* (*tune)(port** portlist, BlockTuneType tune_type);
 		const char* ports_cfg;
 		const char* name;
 #if UNICORN_CFG_BLOCK_DESCRIPTIONS == 1

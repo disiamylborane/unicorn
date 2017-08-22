@@ -3,7 +3,6 @@
 #define UNICORN_TYPES_H_GUARD
 
 #include <stdint.h>
-#include <vector>
 #include "unicorn_cfg.h"
 
 #define UTYPE_q "\x1"
@@ -105,7 +104,7 @@ namespace u
 		The port configuration string one-letter type identifiers
 		are the same to the u::type:: identifiers.
 	*/
-	struct Node;  //extern
+	struct Node;  //external
 	namespace type {
 		typedef bool    q;  /// Boolean port
 		typedef char    c;  /// ASCII symbol port

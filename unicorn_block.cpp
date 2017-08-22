@@ -15,46 +15,46 @@ namespace u
 	bool setup_ports(Node* node)
 	{
 		//Calculate how much memory is needed for all the rigid ports
-		//Also fill <ports> and <exts> fields of <node>
-		uint8_t exts = 0;
-		uint8_t ints = 0;
-		size_t memsize = 0;
+		//Also fill <ports> and <external_ports> fields of <node>
+		uint8_t external_ports = 0;
+		uint8_t internal_ports = 0;
+		size_t memory_ports = 0;
 		for (const char *c = node->core->ports_cfg; *c; c++) {
 			char curr = *c;
 			if (curr == UNICORN_PORT_EXTERNAL) {
-				exts++;
+				external_ports++;
 			}
 			else if (curr == UNICORN_PORT_INTERNAL) {
-				ints++;
+				internal_ports++;
 				char ptype = c[1] & 0x7F;  // bit [7] render type , bits [6:0] data type
 				if (!is_array_type(ptype)) {
 					uint8_t _size = get_type_size(ptype);
 					if (!_size)
 						return false;
-					memsize = _align(memsize, _size);
-					memsize += _size;
+					memory_ports = _align(memory_ports, _size);
+					memory_ports += _size;
 				}
 			}
 		}
-		node->frees = exts;
-		uint8_t ports = exts + ints;
+		node->frees = external_ports;
+		uint8_t ports = external_ports + internal_ports;
 		node->ports = ports;
-		size_t whole_ports_size = sizeof(void*)*(node->ports) + memsize;
+		size_t memory_needed = sizeof(void*)*(node->ports) + memory_ports;
 
 		//Allocate memory for the ports
-		port** portlist = (port**)U_PORTS_MALLOC(whole_ports_size);
+		port** portlist = (port**)U_PORTS_MALLOC(memory_needed);
 		if (!portlist)
 			return false;
 		else 
 			node->portlist = portlist;
-		memset(portlist, 0, whole_ports_size);
+		memset(portlist, 0, memory_needed);
 
 		void* curr_port_address = &portlist[ports];
 
 		//Use the <portlist> pointer to fill in internal ports
 		for (const char *c = node->core->ports_cfg; *c; c++) {
 			if (*c == UNICORN_PORT_INTERNAL) {
-				char ptype = c[1] & 0x7F;
+				char ptype = node_port_get_datatype(c);
 				if (is_array_type(ptype)) {
 					uniseq* _new_arr = new uniseq(get_arr_size(ptype), UNICORN_CFG_uniseq_BLOCK_RESERVE);
 					if (!_new_arr) {
@@ -69,10 +69,8 @@ namespace u
 					*portlist = curr_port_address;
 					curr_port_address = (void*)((size_t)curr_port_address + _size);
 				}
-				portlist++;
 			}
-			else //if (*c == UNICORN_PORT_EXTERNAL)
-				portlist++;
+			portlist++;
 		}
 		return true;
 	}

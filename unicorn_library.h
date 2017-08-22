@@ -5,7 +5,7 @@
 #include "unicorn_cfg.h"
 #include "unicorn_block.h"
 
-#define BLOCK_FACTORY_COUNT 22
+#define BLOCK_FACTORY_COUNT 31
 
 //TODO: is this file really needed?
 namespace u

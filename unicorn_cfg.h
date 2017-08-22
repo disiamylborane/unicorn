@@ -67,5 +67,4 @@ Ports_cfg format:
 #define UNICORN_SYMBOL_INTERNAL_MASK ((char)0x80)
 #define UNICORN_SYMBOL_OUTPUT_MASK ((char)0x80)
 
-
 #endif

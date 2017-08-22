@@ -58,7 +58,7 @@
 
 
 #define __workfunction(cls) type::n* work_##cls(port** portlist)
-#define __tunefunction(cls) const char* tune_##cls(port** portlist)
+#define __tunefunction(cls) const char* tune_##cls(port** portlist, BlockTuneType tune_type)
 
 #define _pl_var(_type, _port) (*((type::_type*)portlist[_port]))
 #define _pl_arr(_port) ((uniseq*)portlist[_port])
@@ -66,42 +66,42 @@
 
 namespace u
 {
-	void uniseq_timing_add_value(type::i time, uniseq *out, bool addPulse)
-	{
-		if (time == 0)
-			return;
+    void uniseq_timing_add_value(type::i time, uniseq *out, bool addPulse)
+    {
+        if (time == 0)
+            return;
 
-		type::i _len = out->size;
-		bool _nowPulse = _len % 2;
+        type::i _len = out->size;
+        bool _nowPulse = _len % 2;
 
-		if (_len == 0) {
-			if (!addPulse)
-				out->push_back_32(0);
-			out->push_back_32(time);
-			return;
-		}
+        if (_len == 0) {
+            if (!addPulse)
+                out->push_back_32(0);
+            out->push_back_32(time);
+            return;
+        }
 
-		if (_nowPulse == addPulse)
-			*((type::i*)out->back()) += time;
-		else
-			out->push_back_32(time);
-	}
-	void uniseq_timing_copy(uniseq *out, uniseq *in) 
-	{
-		int _len = in->size;
-		if (_len == 0)
-			return;
+        if (_nowPulse == addPulse)
+            *((type::i*)out->back()) += time;
+        else
+            out->push_back_32(time);
+    }
+    void uniseq_timing_copy(uniseq *out, uniseq *in) 
+    {
+        int _len = in->size;
+        if (_len == 0)
+            return;
 
-		int _addindex = 0;
-		if (((type::i*)in->begin)[0] == 0) {
-			if (_len == 1)
-				return;
-			_addindex = 1;
-		}
-		uniseq_timing_add_value(((type::i*)in->begin)[_addindex], out, !_addindex);
+        int _addindex = 0;
+        if (((type::i*)in->begin)[0] == 0) {
+            if (_len == 1)
+                return;
+            _addindex = 1;
+        }
+        uniseq_timing_add_value(((type::i*)in->begin)[_addindex], out, !_addindex);
 
-		out->append(in, _addindex + 1);
-	}
+        out->append(in, _addindex + 1);
+    }
 
     __workfunction(Dummy) {
         return 0;
@@ -134,16 +134,16 @@ namespace u
         _pl_var(i, 3) = _pl_var(i, 1) / _pl_var(i, 2);
         _pl_callnext(0);
     }
-	__workfunction(ShiftRightBlock)
-	{
-		_pl_var(i, 3) = _pl_var(i, 1) >> _pl_var(i, 2);
-		_pl_callnext(0);
-	}
-	__workfunction(ShiftLeftBlock)
-	{
-		_pl_var(i, 3) = _pl_var(i, 1) << _pl_var(i, 2);
-		_pl_callnext(0);
-	}
+    __workfunction(ShiftRightBlock)
+    {
+        _pl_var(i, 3) = _pl_var(i, 1) >> _pl_var(i, 2);
+        _pl_callnext(0);
+    }
+    __workfunction(ShiftLeftBlock)
+    {
+        _pl_var(i, 3) = _pl_var(i, 1) << _pl_var(i, 2);
+        _pl_callnext(0);
+    }
 
     __workfunction(ReverseBitsBlock)
     {
@@ -254,13 +254,18 @@ namespace u
 
 
     __tunefunction(CircularBlock) {
-        type::i size = _pl_var(i, 1);
-        uniseq* out = _pl_arr(3);
+		switch(tune_type)
+		{
+		case btt_manual:
+		case btt_start:
+			type::i size = _pl_var(i, 1);
+			uniseq* out = _pl_arr(3);
 
-        out->resize(size);
-        memset(out->begin, 0, sizeof(type::i)*size);
+			out->resize(size);
+			memset(out->begin, 0, sizeof(type::i)*size);
 
-        _pl_var(i, 4) = 0;
+			_pl_var(i, 4) = 0;
+		}
 
         return nullptr;
     }
@@ -304,16 +309,16 @@ namespace u
     static const char* ports_ArithmeticBlock = ref_(n) in_(i) in_(i) out_(i);
     static const char* ports_ComparisonBlock = ref_(n) in_(i) in_(i) out_(q);
 
-	declconst(BoolVarBlock, "Bool", "Bool variable", param_(q));
-	declconst(CharVarBlock, "Char", "Char variable", param_(c));
-	declconst(ByteVarBlock, "Byte", "Byte variable", param_(b));
-	declconst(ShortVarBlock, "Short", "Short variable", param_(h));
-	declconst(LongVarBlock, "Long", "Long variable", param_(i));
-	declconst(LongLongVarBlock, "Long Long", "64bit variable", param_(l));
-	declconst(FloatVarBlock, "Float", "Float variable", param_(f));
-	declconst(DoubleVarBlock, "Double", "Double variable", param_(d));
-	declconst(NodeVarBlock, "Node", "Node variable", param_(n));
-	declconst(TypeVarBlock, "Type", "Type variable", param_(t));
+    declconst(BoolVarBlock, "Bool", "Bool variable", param_(q));
+    declconst(CharVarBlock, "Char", "Char variable", param_(c));
+    declconst(ByteVarBlock, "Byte", "Byte variable", param_(b));
+    declconst(ShortVarBlock, "Short", "Short variable", param_(h));
+    declconst(LongVarBlock, "Long", "Long variable", param_(i));
+    declconst(LongLongVarBlock, "Long Long", "64bit variable", param_(l));
+    declconst(FloatVarBlock, "Float", "Float variable", param_(f));
+    declconst(DoubleVarBlock, "Double", "Double variable", param_(d));
+    declconst(NodeVarBlock, "Node", "Node variable", param_(n));
+    declconst(TypeVarBlock, "Type", "Type variable", param_(t));
 
     declconst(IntArrBlock, "Uniseq/int", "Int array constant", param_(ARR_i));
 
@@ -351,24 +356,24 @@ namespace u
         ref_(n) in(ARR_i, fifo) in(i, first) in(ARR_i, coeffs) out_(i));
 
     const Block* block_factory[] = {
-		&BoolVarBlock,
-		&CharVarBlock,
-		&ByteVarBlock,
-		&ShortVarBlock,
-		&LongVarBlock,
-		&LongLongVarBlock,
-		&FloatVarBlock,
-		&DoubleVarBlock,
-		&NodeVarBlock,
-		&TypeVarBlock,
+        &BoolVarBlock,
+        &CharVarBlock,
+        &ByteVarBlock,
+        &ShortVarBlock,
+        &LongVarBlock,
+        &LongLongVarBlock,
+        &FloatVarBlock,
+        &DoubleVarBlock,
+        &NodeVarBlock,
+        &TypeVarBlock,
         &IntArrBlock,
         &AddArithmeticBlock,
         &SubArithmeticBlock,
         &MulArithmeticBlock,
         &UMulArithmeticBlock,
         &DivArithmeticBlock,
-		&ShiftRightBlock,
-		&ShiftLeftBlock,
+        &ShiftRightBlock,
+        &ShiftLeftBlock,
         &ReverseBitsBlock,
         &PulseCodeModulationBlock,
         &PulseCountModulationBlock,
