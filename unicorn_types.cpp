@@ -2,6 +2,7 @@
 #include <string.h>
 #include "unicorn_types.h"
 #include "unicorn_block.h"
+#include "unicorn_graph.h"
 
 #ifndef UNICORN_CFG_TYPE_DESCRIPTIONS
 #error "UNICORN_CFG_TYPE_DESCRIPTIONS not defined"
@@ -27,6 +28,7 @@ namespace u
 		__DECLARE_UNICORN_TYPE(CHAR_TYPE(d), sizeof(type::d), "Double")
 		__DECLARE_UNICORN_TYPE(CHAR_TYPE(n), sizeof(type::n), "Node")
 		__DECLARE_UNICORN_TYPE(CHAR_TYPE(t), sizeof(type::t), "Type")
+		__DECLARE_UNICORN_TYPE(CHAR_TYPE(g), sizeof(type::g), "Function graph")
 	};
 
 	uint8_t get_type_size(char symbol)
@@ -93,8 +95,8 @@ namespace u
 				begin = U_ARRAY_REALLOC(begin, newcap*elsize);
 			else
 				begin = U_ARRAY_MALLOC(newcap*elsize);
+			capacity = newcap;
 		}
-		capacity = newcap;
 	}
 	void uniseq::resize(uint16_t newsize)
 	{

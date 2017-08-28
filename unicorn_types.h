@@ -15,6 +15,7 @@
 #define UTYPE_d "\x8"
 #define UTYPE_n "\x9"
 #define UTYPE_t "\xA"
+#define UTYPE_g "\xB"
 
 #define UTYPE_ARR_q "\x41"
 #define UTYPE_ARR_c "\x42"
@@ -26,6 +27,7 @@
 #define UTYPE_ARR_d "\x48"
 #define UTYPE_ARR_n "\x49"
 #define UTYPE_ARR_t "\x4A"
+#define UTYPE_ARR_g "\x4B"
 
 #define UTYPE_DIR_q "\x81"
 #define UTYPE_DIR_c "\x82"
@@ -37,6 +39,7 @@
 #define UTYPE_DIR_d "\x88"
 #define UTYPE_DIR_n "\x89"
 #define UTYPE_DIR_t "\x8A"
+#define UTYPE_DIR_g "\x8B"
 
 #define UTYPE_DIR_ARR_q "\xC1"
 #define UTYPE_DIR_ARR_c "\xC2"
@@ -48,6 +51,7 @@
 #define UTYPE_DIR_ARR_d "\xC8"
 #define UTYPE_DIR_ARR_n "\xC9"
 #define UTYPE_DIR_ARR_t "\xCA"
+#define UTYPE_DIR_ARR_g "\xCB"
 
 #define CHAR_TYPE(x) UTYPE_##x[0]
 
@@ -65,7 +69,9 @@ namespace u
 	public:
 		void* begin;
 		uint16_t size, capacity;
-		
+
+		uniseq() {};//For placement new
+
 		uniseq(uint8_t element_size, uint16_t initial_capacity);
 		~uniseq();
 		void reserve(uint16_t newcap);
@@ -105,6 +111,7 @@ namespace u
 		are the same to the u::type:: identifiers.
 	*/
 	struct Node;  //external
+	class Function;  //external
 	namespace type {
 		typedef bool    q;  /// Boolean port
 		typedef char    c;  /// ASCII symbol port
@@ -118,6 +125,7 @@ namespace u
 		typedef double  d;  /// Double precision float port
 
 		typedef Node n;
+		typedef Function g;
 
 		typedef char t;
 	}

@@ -48,7 +48,10 @@ namespace u
 	typedef enum PortLocation { pl_external = 0, pl_internal = 1, pl_error = 0x7F} PortLocation;
 	typedef enum PortDirection { pd_input = false, pd_output = true } PortDirection;
 
-	PortDefinition node_port_get_definition(Node* node, int port);
+	int block_port_get_count(const char *cfg);
+	bool defs_equal(PortDefinition d1, PortDefinition d2);
+
+	PortDefinition node_port_get_definition(const Block* bl, int port);
 	PortLocation node_port_get_location(PortDefinition def);
 	PortDirection node_port_get_direction(PortDefinition def);
 	char node_port_get_datatype(PortDefinition def);

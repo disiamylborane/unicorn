@@ -7,11 +7,29 @@
 using namespace std;
 
 namespace u {
-	
+
+	class Mark;
+	class Graph;
+
+	class Mark {
+		friend void pspec_ui(Graph *g);
+
+	public:
+		uniseq *name; //string
+
+		uint16_t node;
+		uint8_t port;
+
+		Mark(int reserve = 5);
+		Mark(const char* _name);
+		~Mark();
+	};
+
+
 	//TODO: add clean method, replace platform_specific <clear> behaviour
 	// note: now cleaning the graph is calling destructor + placement new
 	class Graph {
-		friend bool pspec_ui(Graph *g);
+		friend void pspec_ui(Graph *g);
 	protected:
 		struct StencilBuffer {
 			uint16_t out_node;
@@ -19,33 +37,66 @@ namespace u {
 			uint8_t out_port;
 			uint8_t in_port;
 		};
-		uniseq *nodes;
-		uniseq *stencil_buffer;
 
+		uniseq *stencil_buffer;
+	public:
+		uniseq *nodes;
+		uniseq *mark_buffer;
+
+	protected:
 		PortLocation _get_port_location(int node, int port);
 		void _add_stencil(uint16_t bout, uint8_t pout, uint16_t bin, uint8_t pin);
 		void _del_stencil(int index);
+		int _port_marked(int node, int port);
+		int _port_connected(int node, int port);
+		int _node_marked(int node);
 
 	public:
-		Graph(int reserve_nodes = 16, int reserve_stencil = 32, int reserve_const = 16);
+		Graph(int reserve_nodes = 16, int reserve_stencil = 32, int reserve_mark = 4);
 		~Graph();
 
-		void add_node(const Block* block, int xpos, int ypos);
+		void add_node(const Block* block, int xpos, int ypos, Function* hierarchical_func = nullptr);
 		void del_node(int index);
+		Node* get_node(int index);
 
 		void move(int node, int deltax, int deltay);
 
-		void link(int node, int port, int to);
+		bool link(int node, int port, int to);
 		void unlink(int node, int port);
 
 		bool connect(int node1, int port1, int node2, int port2);
 		void disconnect(int node, int port);
 
+		bool mark(uint16_t node, uint8_t port, const char* name);
+		void unmark(uint16_t markindex);
+
 		void tune();
 		void run(int index);
 	};
 
-	bool pspec_ui(Graph *g);
+	class Function {
+	protected:
+
+		//The first member is always <parent> Function*
+		uniseq ports_cfg;
+
+	public:
+		Graph routine;
+		Block represent;
+		Node* start_node;
+
+	public:
+		Function(const char* name, const char* desc = nullptr);
+		~Function();
+
+	protected:
+		void update_block_hard(int markcount);
+
+	public:
+		//Return whether ports_cfg is updated and the parents must delete all nodes of this block
+		bool update_block();
+	};
+	void pspec_ui(Graph *g);
 }
 
 #endif
