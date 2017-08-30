@@ -1,19 +1,9 @@
-#include <ctype.h>
+
 #include <string.h>
 #include "unicorn_types.h"
 #include "unicorn_block.h"
 #include "unicorn_graph.h"
-
-#ifndef UNICORN_CFG_TYPE_DESCRIPTIONS
-#error "UNICORN_CFG_TYPE_DESCRIPTIONS not defined"
-#endif
-#if UNICORN_CFG_TYPE_DESCRIPTIONS == 1
-#define __DECLARE_UNICORN_TYPE(sym,size,desc) {sym, size, desc},
-#elif UNICORN_CFG_TYPE_DESCRIPTIONS == 0
-#define __DECLARE_UNICORN_TYPE(sym,size,desc) {sym, size},
-#else 
-#error "Wrong UNICORN_CFG_TYPE_DESCRIPTIONS parameter"
-#endif
+#include "unicorn_macro.h"
 
 namespace u
 {

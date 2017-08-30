@@ -2,14 +2,24 @@
 #include <iostream>
 #include <string.h>
 #include <inttypes.h>
-#include "unicorn_cfg.h"
+
+#include "unicorn_library.h"
 #include "unicorn_graph.h"
 
 #ifdef _MSC_VER
 #define gets gets_s
 #endif
 
+u::uniseq global_functions;
+using std::cout;
+using std::cin;
+using std::endl;
+
 namespace u {
+
+	const Block* libs[] = { lib_const, lib_standard, lib_linecode };
+	const size_t libcounts[] = { lib_const_count, lib_standard_count, lib_linecode_count };
+
 	char s[256];
 	char *w;
 
@@ -59,7 +69,7 @@ namespace u {
 		void* val = malloc(sz);
 		switch (type) {
 		case UTYPE_q[0]:
-			*(bool*)val = atoi(s);
+			*(bool*)val = !!atoi(s);
 			break;
 		case UTYPE_c[0]:
 			*(char*)val = atoi(s);
@@ -77,10 +87,13 @@ namespace u {
 			*(uint64_t*)val = atoi(s);
 			break;
 		case UTYPE_f[0]:
-			*(float*)val = atof(s);
+			*(float*)val = (float)atof(s);
 			break;
 		case UTYPE_d[0]:
 			*(double*)val = atof(s);
+			break;
+		case UTYPE_t[0]:
+			*(type::t*)val = atoi(s);
 			break;
 		default:
 			free(val);
@@ -104,18 +117,32 @@ namespace u {
 			curx = cury = 0;
 
 			if (strstr(s, "add ") == s) {
+				int i1, i2;
+				w = &s[4];
+				if (sscanf(w, "%d %d", &i1, &i2) < 2)
+					cout << "Error\n";
+				else {
+					if (i1 >= sizeof(libs) / sizeof(libs[0])) {
+						cout << "No library "<< i1 << endl;
+					}
+					if (i2 >= libcounts[i1]) {
+						cout << "No function " << i2 << " in library" << i1 << endl;
+					}
+					g->add_node(&libs[i1][i2], curx, cury);
+				}
+			}
+			if (strstr(s, "del ") == s) {
 				w = &s[4];
 				uintmax_t num = strtoumax(w, nullptr, 10);
 				if (num == UINTMAX_MAX && errno == ERANGE) {
 					cout << "Error\n";
 				}
 				else {
-					g->add_node(block_factory[num], curx, cury);
+					g->del_node(num);
 				}
 			}
 			else if (strstr(s, "clear") == s) {
-				g->~Graph();
-				g = new (g) Graph;
+				g->clear();
 			}
 			else if (strstr(s, "cur ") == s) {
 				int i1, i2;
@@ -157,7 +184,6 @@ namespace u {
 			}
 			else if (strstr(s, "umark ") == s) {
 				int i1;
-				char mktext[64];
 				w = &s[6];
 				if (sscanf(w, "%d", &i1) < 1)
 					cout << "Error\n";
@@ -176,7 +202,7 @@ namespace u {
 				}
 			}
 			else if (strstr(s, "ucnt ")) {
-				int i1, i2, i3, i4;
+				int i1, i2;
 				w = &s[5];
 				if (sscanf(w, "%d %d", &i1, &i2) < 2)
 					cout << "Error\n";
@@ -192,7 +218,7 @@ namespace u {
 				if (sscanf(w, "%d %d %s", &i1, &i2, rest) < 3)
 					cout << "Error\n";
 				else {
-					Node* nd = ((Node**)g->nodes->begin)[i1];
+					Node* nd = ((Node**)g->node_buffer->begin)[i1];
 					PortDefinition pd = node_port_get_definition(nd->core, i2);
 					if (node_port_get_location(pd) == pl_internal) {
 						char psym = node_port_get_datatype(pd);
@@ -221,8 +247,16 @@ namespace u {
 					}
 				}
 			}
-			else if (strstr(s, "tune") == s) {
-				g->tune();
+			else if (strstr(s, "ready") == s) {
+				g->ready();
+			}
+			else if (strstr(s, "tune ") == s) {
+				int i1;
+				w = &s[5];
+				if (sscanf(w, "%d", &i1) < 1)
+					cout << "Error\n";
+				else
+					g->tune_node(i1);
 			}
 			else if (strstr(s, "run ") == s) {
 				int i1;
@@ -230,24 +264,51 @@ namespace u {
 				if (sscanf(w, "%d", &i1) < 1)
 					cout << "Error\n";
 				else
-					run_blocks(((Node**)g->nodes->begin)[i1]);
+					run_blocks(((Node**)g->node_buffer->begin)[i1]);
 			}
 			else if (strstr(s, "chk") == s) {
 				int i1;
 				w = &s[3];
-				if (sscanf(w, " %d", &i1) < 1) {
-					for (int i = 0; i < BLOCK_FACTORY_COUNT; i++) {
-						cout << i << ". [" << block_factory[i]->name << "] " << block_factory[i]->description << endl;
+				if (sscanf(w, " %d", &i1) == 1) {
+					switch (i1)
+					{
+					case 0:
+						for (int i = 0; i < lib_const_count; i++) {
+							cout << i << ". [" << lib_const[i].name << "] " << lib_const[i].description << endl;
+						}
+						break;
+					case 1:
+						for (int i = 0; i < lib_standard_count; i++) {
+							cout << i << ". [" << lib_standard[i].name << "] " << lib_standard[i].description << endl;
+						}
+						break;
+					case 2:
+						for (int i = 0; i < lib_linecode_count; i++) {
+							cout << i << ". [" << lib_linecode[i].name << "] " << lib_linecode[i].description << endl;
+						}
+						break;
+					default:
+						break;
 					}
 				}
 				else {
-					cout << block_factory[i1]->name << " // " << block_factory[i1]->description << endl;
+					cout << "Error";
+				}
+			}
+			else if (strstr(s, "fchk") == s) {
+				for (int i = 0; i < global_functions.size; i++) {
+					Block* b = &((Function**)global_functions.begin)[i]->represent;
+					cout << "Function" << i;
+					if (b->name)
+						cout << ". [" << (char*)b->name << "] ";
+					if (b->description)
+						cout << b->description << endl;
 				}
 			}
 			else if (strstr(s, "list") == s) {
 				cout << "\n-----------------\n";
-				for (int _i = 0; _i < g->nodes->size; _i++) {
-					Node *i = (((Node**)g->nodes->begin)[_i]);
+				for (int _i = 0; _i < g->node_buffer->size; _i++) {
+					Node *i = (((Node**)g->node_buffer->begin)[_i]);
 					cout << "  Node" << _i << " {" << i;
 					cout << "} ";
 					cout << i->core->name;
@@ -292,19 +353,55 @@ namespace u {
 				}
 			}
 			else if (strstr(s, "def ") == s) {
-				int i1, i2, i3;
+				int i1;
 				char name[20];
 				w = &s[4];
 				if (sscanf(w, "%s", name) < 1)
 					cout << "Error\n";
 				else {
-					u::Function *f = new u::Function(name);
+					Function *f = new u::Function(name);
 					pspec_ui(&f->routine);
 					cout << "Start node:\n";
 					cin >> i1;
-					f->start_node = ((Node**)f->routine.nodes->begin)[i1];
+					f->start_node = ((Node**)f->routine.node_buffer->begin)[i1];
 					f->update_block();
-					g->add_node(&f->represent, 0, 0, f);
+					global_functions.push_back_pointer(f);
+				}
+			}
+			else if (strstr(s, "call ") == s) {
+				int i1;
+				w = &s[5];
+				if (sscanf(w, "%i", &i1) < 1)
+					cout << "Error\n";
+				else {
+					if (global_functions.size > i1) {
+						Function *f = ((Function**)global_functions.begin)[i1];
+						g->add_node(&f->represent, 0, 0, f);
+					}
+					else
+						cout << "Function " << i1 << " not defined";
+				}
+			}
+			else if (strstr(s, "edit ") == s) {
+				int i1;
+				w = &s[5];
+				if (sscanf(w, "%i", &i1) < 1)
+					cout << "Error\n";
+				else {
+					Function *f = *(Function **)global_functions.at(i1);
+					pspec_ui(&f->routine);
+					cout << "Start node:\n";
+					cin >> i1;
+					f->start_node = ((Node**)f->routine.node_buffer->begin)[i1];
+					if(f->update_block()){
+						for (int i = 0; i < g->node_buffer->size; i++) {
+							Node* cn = ((Node**)g->node_buffer->begin)[i];
+							if (cn->core == &f->represent) {
+								g->del_node(i);
+								i--;
+							}
+						}
+					}
 				}
 			}
 			else if (strstr(s, "exit") == s) {

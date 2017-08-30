@@ -2,9 +2,8 @@
 #ifndef UNICORN_GRAPH_H_GUARD
 #define UNICORN_GRAPH_H_GUARD
 
-#include "unicorn_library.h"
-
-using namespace std;
+#include "unicorn_cfg.h"
+#include "unicorn_block.h"
 
 namespace u {
 
@@ -31,7 +30,7 @@ namespace u {
 	class Graph {
 		friend void pspec_ui(Graph *g);
 	protected:
-		struct StencilBuffer {
+		struct Stencil {
 			uint16_t out_node;
 			uint16_t in_node;
 			uint8_t out_port;
@@ -40,7 +39,7 @@ namespace u {
 
 		uniseq *stencil_buffer;
 	public:
-		uniseq *nodes;
+		uniseq *node_buffer;
 		uniseq *mark_buffer;
 
 	protected:
@@ -49,11 +48,15 @@ namespace u {
 		void _del_stencil(int index);
 		int _port_marked(int node, int port);
 		int _port_connected(int node, int port);
-		int _node_marked(int node);
+		//int _node_marked(int node);
+
+		void clear_nodes();
 
 	public:
 		Graph(int reserve_nodes = 16, int reserve_stencil = 32, int reserve_mark = 4);
 		~Graph();
+
+		void clear();
 
 		void add_node(const Block* block, int xpos, int ypos, Function* hierarchical_func = nullptr);
 		void del_node(int index);
@@ -70,7 +73,8 @@ namespace u {
 		bool mark(uint16_t node, uint8_t port, const char* name);
 		void unmark(uint16_t markindex);
 
-		void tune();
+		void tune_node(int node);
+		void ready();
 		void run(int index);
 	};
 
@@ -93,7 +97,7 @@ namespace u {
 		void update_block_hard(int markcount);
 
 	public:
-		//Return whether ports_cfg is updated and the parents must delete all nodes of this block
+		//Return whether ports_cfg is updated and the parents must delete all node_buffer of this block
 		bool update_block();
 	};
 	void pspec_ui(Graph *g);

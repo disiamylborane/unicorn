@@ -11,5 +11,19 @@
 namespace u
 {
 	extern const Block* block_factory[BLOCK_FACTORY_COUNT];
+
+	type::n* work_dummy(port** portlist);
+	NodeTuneResult tune_dummy(Node* node, NodeTuneType tune_type);
+	extern const char* string_dummy;
+
+	extern const Block lib_const[];
+	extern const size_t lib_const_count;
+
+	extern const Block lib_standard[];
+	extern const size_t lib_standard_count;
+
+	extern const Block lib_linecode[];
+	extern const size_t lib_linecode_count;
+
 }
 #endif

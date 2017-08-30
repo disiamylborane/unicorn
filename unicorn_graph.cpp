@@ -3,6 +3,11 @@
 #include <string.h>
 #include "unicorn_graph.h"
 
+#define NODE ((Node**)node_buffer->begin)
+#define PORT(node,port) (NODE[node]->portlist[port])
+#define STENCIL ((Stencil*)stencil_buffer->begin)
+#define MARK ((Mark*)mark_buffer->begin)
+
 namespace u {
 	Mark::Mark(int reserve) {
 		name = new uniseq(sizeof(char), reserve);
@@ -18,37 +23,37 @@ namespace u {
 	}
 
 	Graph::Graph(int reserve_nodes, int reserve_stencil, int reserve_mark) {
-		nodes = new uniseq(sizeof (Node*), reserve_nodes);
-		stencil_buffer = new uniseq(sizeof(StencilBuffer), reserve_stencil);
+		node_buffer = new uniseq(sizeof (Node*), reserve_nodes);
+		stencil_buffer = new uniseq(sizeof(Stencil), reserve_stencil);
 		mark_buffer = new uniseq(sizeof(Mark), reserve_mark);
 	}
 
 	Graph::~Graph() {
-		Node** begin = (Node**)nodes->begin;
-		for (Node **b = begin; b < &begin[nodes->size]; b++){
-			destroy_ports(*b);
-			delete (*b);
-		}
-		delete nodes;
+		clear_nodes();
+		delete node_buffer;
 		delete stencil_buffer;
 		delete mark_buffer;
 	}
+	void Graph::clear_nodes() {
+		for (Node **b = NODE; b < NODE + node_buffer->size; b++) {
+			destroy_ports(*b);
+			delete (*b);
+		}
+	}
+	void Graph::clear() {
+		clear_nodes();
+
+		node_buffer->clear();
+		stencil_buffer->clear();
+		mark_buffer->clear();
+	}
 
 	void Graph::_add_stencil(uint16_t bout, uint8_t pout, uint16_t bin, uint8_t pin) {
-		StencilBuffer el = { bout , bin , pout , pin };
+		Stencil el = { bout , bin , pout , pin };
 		stencil_buffer->push_back(&el);
 	}
 	void Graph::_del_stencil(int index) {
 		stencil_buffer->remove(index);
-	}
-
-	int Graph::_node_marked(int node) {
-		Mark *m = (Mark*)mark_buffer->begin;
-		for (int i = 0; i < mark_buffer->size; i++, m++) {
-			if ((m->node == node))
-				return i;
-		}
-		return -1;
 	}
 
 	int Graph::_port_marked(int node, int port) {
@@ -61,8 +66,8 @@ namespace u {
 	}
 
 	int Graph::_port_connected(int node, int port) {
-		StencilBuffer *s = (StencilBuffer*)stencil_buffer->begin;
-		for (int i = 0; i < nodes->size; i++, s++) {
+		Stencil *s = STENCIL;
+		for (int i = 0; i < node_buffer->size; i++, s++) {
 			if ((s->in_node == node) && (s->in_port == port))
 				return i;
 			if ((s->out_node == node) && (s->out_port == port))
@@ -75,7 +80,7 @@ namespace u {
 		Node* nd = new_node(block);
 		nd->xpos = xpos;
 		nd->ypos = ypos;
-		nodes->push_back_pointer(nd);
+		node_buffer->push_back_pointer(nd);
 
 		PortDefinition pd = node_port_get_definition(nd->core, 0);
 		if (node_port_get_datatype(pd) == UTYPE_g[0])
@@ -83,51 +88,48 @@ namespace u {
 	}
 
 	void Graph::del_node(int index) {
-		while (true) {
-			int markindex = _node_marked(index);
-			if (markindex != -1)
-				mark_buffer->remove(markindex);
-			else
-				break;
-		}
-
-		nodes->remove(index);
+		node_buffer->remove(index);
 
 		for (unsigned int i = 0; i < stencil_buffer->size; i++) {
-			StencilBuffer* stencil = (StencilBuffer*)stencil_buffer->at(i);
+			Stencil* stencil = STENCIL + i;
 			if (stencil->in_node > index)
 				stencil->in_node -= 1;
 			if (stencil->out_node > index)
 				stencil->out_node -= 1;
 
 			if (stencil->out_node == index) {
-				((Node**)nodes->begin)[stencil->in_node]->portlist[stencil->in_port] = 0;
+				PORT(stencil->in_node, stencil->in_port) = 0;
 			}
-			if (stencil->in_node != index)
-				continue;
-			stencil_buffer->remove(i);
-			i--;
+			if (stencil->in_node == index) {
+				stencil_buffer->remove(i);
+				i--;
+			}
 		}
+
 		for (unsigned int i = 0; i < mark_buffer->size; i++) {
 			Mark* m = (Mark*)mark_buffer->at(i);
 			if (m->node > index)
 				m->node--;
+			else if (m->node == index) {
+				mark_buffer->remove(i);
+				i--;
+			}
 		}
 	}
 
 	Node* Graph::get_node(int index) {
-		if (index > nodes->size)
+		if (index > node_buffer->size)
 			return nullptr;
-		return ((Node**)nodes->begin)[index];
+		return NODE[index];
 	}
 
 	void Graph::move(int node, int deltax, int deltay) {
-		((Node**)nodes->begin)[node]->xpos += deltax;
-		((Node**)nodes->begin)[node]->ypos += deltay;
+		NODE[node]->xpos += deltax;
+		NODE[node]->ypos += deltay;
 	}
 
 	PortLocation Graph::_get_port_location(int node, int port) {
-		Node* _working = ((Node**)nodes->begin)[node];
+		Node* _working = NODE[node];
 		PortDefinition pd = node_port_get_definition(_working->core, port);
 		return node_port_get_location(pd);
 	}
@@ -135,10 +137,11 @@ namespace u {
 	bool Graph::link(int node, int port, int to) {
 		if (_port_marked(node, port) != -1)
 			return false;
-		((Node**)nodes->begin)[node]->portlist[port] = ((Node**)nodes->begin)[to];
+		PORT(node,port) = NODE[to];
+		return true;
 	}
 	void Graph::unlink(int node, int port) {
-		((Node**)nodes->begin)[node]->portlist[port] = nullptr;
+		PORT(node, port) = nullptr;
 	}
 
 	bool Graph::connect(int node1, int port1, int node2, int port2){
@@ -168,7 +171,7 @@ namespace u {
 			portO = port2;
 		}
 		_add_stencil(nodeO, portO, nodeI, portI);
-		((Node**)nodes->begin)[nodeI]->portlist[portI] = ((Node**)nodes->begin)[nodeO]->portlist[portO];
+		PORT(nodeI, portI) = PORT(nodeO, portO);
 		
 		return true;
 	}
@@ -181,7 +184,7 @@ namespace u {
 
 		Mark _temp(0);
 		mark_buffer->push_back(&_temp);
-		Mark* work = ((Mark*)mark_buffer->begin) + mark_buffer->size - 1;
+		Mark* work = MARK + mark_buffer->size - 1;
 		new (work) Mark(name);
 		work->node = node;
 		work->port = port;
@@ -195,11 +198,12 @@ namespace u {
 
 	void Graph::disconnect(int node, int port) {
 		for (unsigned int i = 0; i < stencil_buffer->size;) {
-			if (((((StencilBuffer*)stencil_buffer->begin)[node].in_node == node) && (((StencilBuffer*)stencil_buffer->begin)[i].in_port == port)) ||
-				((((StencilBuffer*)stencil_buffer->begin)[i].out_node == node) && (((StencilBuffer*)stencil_buffer->begin)[i].out_port == port)))
+			auto cstencil = &STENCIL[i];
+
+			if (((cstencil->in_node == node) && (cstencil->in_port == port)) ||
+				((cstencil->out_node == node) && (cstencil->out_port == port)))
 			{
-				//TODO: refactor this dinosaur
-				((Node**)nodes->begin)[((StencilBuffer*)stencil_buffer->begin)[i].in_node]->portlist[((StencilBuffer*)stencil_buffer->begin)[i].in_port] = 0;
+				PORT(cstencil->in_node, cstencil->in_port) = 0;
 
 				_del_stencil(i);
 			}
@@ -207,24 +211,30 @@ namespace u {
 		}
 	}
 
-	void Graph::tune()
+	void Graph::tune_node(int node)
 	{
-		Node** begin = (Node**)nodes->begin;
-		for (Node **b = begin; b < &begin[nodes->size]; b++) {
-			(*b)->core->tune((*b)->portlist, btt_start);
+		if (node >= node_buffer->size)
+			return;
+		Node *n = NODE[node];
+		n->core->tune(n, ntt_manual);
+	}
+	void Graph::ready()
+	{
+		for (Node **b = NODE; b < NODE + node_buffer->size; b++) {
+			(*b)->core->tune(*b, ntt_start);
 		}
 	}
 	void Graph::run(int index)
 	{
-		run_blocks(((Node**)nodes->begin)[index]);
+		run_blocks(NODE[index]);
 	}
 
 
-	extern const char* tune_Dummy(port** portlist, BlockTuneType tune_type);
+	extern NodeTuneResult tune_dummy(Node* node, NodeTuneType tune_type);
 	static type::n* work_FunctionBlock(port** portlist)
 	{
 		type::g* fn = ((type::g*)portlist[0]);
-		uniseq *nodes = fn->routine.nodes;
+		uniseq *nodes = fn->routine.node_buffer;
 		uniseq *marks = fn->routine.mark_buffer;
 		for (int i = 0; i < marks->size; i++)
 		{
@@ -232,7 +242,6 @@ namespace u {
 			Node* curr = ((Node**)nodes->begin)[cmark->node];
 			curr->portlist[cmark->port] = portlist[i + 1];
 		}
-
 		return fn->start_node;
 	}
 
@@ -254,7 +263,7 @@ namespace u {
 #endif
 		represent.ports_cfg = (char*)ports_cfg.begin;
 		represent.work = work_FunctionBlock;
-		represent.tune = tune_Dummy;
+		represent.tune = tune_dummy;
 	}
 	Function::~Function() {
 		ports_cfg.~uniseq();
@@ -268,7 +277,7 @@ namespace u {
 
 		for (int m = 0; m < markcount; m++) {
 			Mark* mark = &(((Mark*)routine.mark_buffer->begin)[m]);
-			PortDefinition defgr = node_port_get_definition(((Node**)(routine.nodes->begin))[mark->node]->core, mark->port);
+			PortDefinition defgr = node_port_get_definition(((Node**)(routine.node_buffer->begin))[mark->node]->core, mark->port);
 
 			ports_cfg.push_back_8(defgr[0]);
 			ports_cfg.push_back_8(defgr[1]);
@@ -280,18 +289,26 @@ namespace u {
 	}
 
 	bool Function::update_block() {
+		bool update_soft = false;
 		int markcount = routine.mark_buffer->size;
-		if (block_port_get_count(represent.ports_cfg) == markcount) {
+		if (block_port_get_count(represent.ports_cfg) == markcount+1) {
 			for (int i = 0; i < markcount; i++) {
-				PortDefinition defbl = node_port_get_definition(&represent, i);
+				PortDefinition defbl = node_port_get_definition(&represent, i+1);
 				Mark* mark = &(((Mark*)routine.mark_buffer->begin)[i]);
-				PortDefinition defgr = node_port_get_definition(((Node**)(routine.nodes->begin))[mark->node]->core, mark->port);
+				PortDefinition defgr = node_port_get_definition(((Node**)(routine.node_buffer->begin))[mark->node]->core, mark->port);
 
-				if (!defs_equal(defbl, defgr)) {
+				//TODO: unhardcode and rename
+				if ((defbl[0] != defgr[0]) && (defbl[1] != defgr[1])) {
 					update_block_hard(markcount);
 					return true;
 				}
+
+				if (!defs_equal(defbl+2, defgr+2)) {
+					update_soft = true;
+				}
 			}
+			if(update_soft)
+				update_block_hard(markcount);
 			return false;
 		}
 		update_block_hard(markcount);

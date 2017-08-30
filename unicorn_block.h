@@ -4,26 +4,22 @@
 
 #include "unicorn_types.h"
 #include "unicorn_cfg.h"
-
-#ifndef UNICORN_CFG_BLOCK_DESCRIPTIONS
-#error "UNICORN_CFG_BLOCK_DESCRIPTIONS not defined"
-#endif
-#if (UNICORN_CFG_BLOCK_DESCRIPTIONS != 1) && (UNICORN_CFG_BLOCK_DESCRIPTIONS != 0)
-#error "Wrong UNICORN_CFG_BLOCK_DESCRIPTIONS parameter"
-#endif
+#include "unicorn_macro.h"
 
 namespace u
 {	
-	//btt_manual: manually called in user interface
-	//btt_loaded: the block is now loaded from file
-	//btt_saving: the block wil now be saved to file
+	//ntt_manual: manually called in user interface
+	//ntt_loaded: the block is now loaded from file
+	//ntt_saving: the block wil now be saved to file
 	//btt_begin: called by <Graph> before the work starts
-	typedef enum BlockTuneType {btt_manual, btt_loaded, btt_saving, btt_start, btt_stop} BlockTuneType;
+	typedef enum NodeTuneType {ntt_manual, ntt_loaded, ntt_saving, ntt_start, ntt_stop} NodeTuneType;
+
+	typedef enum NodeTuneResult { ntr_ok, ntr_portlist_changed, ntr_memory_error} NodeTuneResult;
 	
 	struct Block
 	{
 		type::n* (*work)(port** portlist);
-		const char* (*tune)(port** portlist, BlockTuneType tune_type);
+		NodeTuneResult (*tune)(Node* node, NodeTuneType tune_type);
 		const char* ports_cfg;
 		const char* name;
 #if UNICORN_CFG_BLOCK_DESCRIPTIONS == 1
@@ -34,12 +30,12 @@ namespace u
 	struct Node
 	{
 		port **portlist;
+		void* internal;
 		int16_t xpos, ypos;
 		uint8_t frees, ports, reserved0, reserved1;
 		
 		const Block *core;
 	};
-	
 	
 	bool setup_ports(Node* node);
 	void destroy_ports(Node* node);
@@ -52,6 +48,7 @@ namespace u
 	bool defs_equal(PortDefinition d1, PortDefinition d2);
 
 	PortDefinition node_port_get_definition(const Block* bl, int port);
+
 	PortLocation node_port_get_location(PortDefinition def);
 	PortDirection node_port_get_direction(PortDefinition def);
 	char node_port_get_datatype(PortDefinition def);

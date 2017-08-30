@@ -16,15 +16,24 @@
 
 #define UNICORN_CFG_ARM_SPECIFIC_CODE 0
 
+// used in runtime
 #define U_PORTS_MALLOC malloc
+#define U_PORTS_REALLOC realloc
 #define U_PORTS_FREE free
 
+// used in runtime
 #define U_NODE_MALLOC malloc
 #define U_NODE_FREE free
 
+// usually not used in runtime
+#define U_NODE_INTERNAL_MALLOC malloc
+#define U_NODE_INTERNAL_FREE free
+
+// not used in runtime
 #define U_GRAPH_MALLOC malloc
 #define U_GRAPH_FREE free
 
+// used in runtime
 #define U_ARRAY_MALLOC malloc
 #define U_ARRAY_REALLOC realloc
 #define U_ARRAY_FREE free
@@ -50,7 +59,7 @@ Ports_cfg format:
 		0x7F means "input port" or "output by reference". The Node class doesn't
 			allocate memory for this port, data are external
 		0xFF means "output port" or "settings port". The Node class allocates
-			memory, the data are internal and can be shared to other nodes.
+			memory, the data are internal and can be shared to other node_buffer.
 	
 	[data_type_symbol]:
 		bit 7: if set, the port is Reference/Settings. If reset, the port is Input/Output
@@ -65,6 +74,6 @@ Ports_cfg format:
 #define UNICORN_SYMBOL_IS_PORT(c) ((c | (char)0x80) == (char)0xFF)
 
 #define UNICORN_SYMBOL_INTERNAL_MASK ((char)0x80)
-#define UNICORN_SYMBOL_OUTPUT_MASK ((char)0x80)
+#define UNICORN_SYMBOL_DIR_MASK ((char)0x80)
 
 #endif

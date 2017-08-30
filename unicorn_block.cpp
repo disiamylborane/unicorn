@@ -146,7 +146,7 @@ namespace u
 	}
 	PortDirection node_port_get_direction(PortDefinition def)
 	{
-		if ((def[1]) & UNICORN_SYMBOL_OUTPUT_MASK)
+		if ((def[1]) & UNICORN_SYMBOL_DIR_MASK)
 			return pd_output;
 		else
 			return pd_input;
@@ -172,11 +172,14 @@ namespace u
 			U_NODE_FREE(ret);
 			return nullptr;
 		}
+		ret->internal = nullptr;
 		return ret;
 	}
 	
 	void free_node(Node* nd){
 		destroy_ports(nd);
+		if (nd->internal)
+			U_NODE_INTERNAL_FREE(nd->internal);
 		U_NODE_FREE(nd);
 	}
 
