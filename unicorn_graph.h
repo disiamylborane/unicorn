@@ -76,6 +76,9 @@ namespace u {
 		void tune_node(int node);
 		void ready();
 		void run(int index);
+		
+		void save_file(int fd);
+		bool load_file(int fd);
 	};
 
 	class Function {

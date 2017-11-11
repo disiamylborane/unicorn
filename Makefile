@@ -7,16 +7,19 @@ all: unicorn
 
 unicorn: compile test.cpp
 	$(CC) -c test.cpp -o test.o
-	$(LD) -o unicorn test.o unicorn_block.o unicorn_graph.o unicorn_platform_specific.o unicorn_types.o unicorn_lib_std.o unicorn_lib_send.o unicorn_lib_recv.o unicorn_lib_linecode.o unicorn_lib_const.o
+	$(LD) -o unicorn test.o unicorn_block.o unicorn_graph.o unicorn_platform_specific.o unicorn_types.o unicorn_library.o unicorn_lib_std.o unicorn_lib_send.o unicorn_lib_recv.o unicorn_lib_linecode.o unicorn_lib_const.o
 	make clean
 
-compile: unicorn_block.o unicorn_graph.o unicorn_platform_specific.o unicorn_types.o unicorn_lib_std.o unicorn_lib_send.o unicorn_lib_recv.o unicorn_lib_linecode.o unicorn_lib_const.o
+compile: unicorn_block.o unicorn_graph.o unicorn_platform_specific.o unicorn_types.o unicorn_library.o unicorn_lib_std.o unicorn_lib_send.o unicorn_lib_recv.o unicorn_lib_linecode.o unicorn_lib_const.o
 
 unicorn_block.o: unicorn_block.cpp
 	$(CC) -c unicorn_block.cpp
 
 unicorn_graph.o: unicorn_graph.cpp
 	$(CC) -c unicorn_graph.cpp
+
+unicorn_library.o: unicorn_library.cpp
+	$(CC) -c unicorn_library.cpp
 
 unicorn_lib_std.o: unicorn_lib_std.cpp
 	$(CC) -c unicorn_lib_std.cpp

@@ -1,7 +1,10 @@
 
 #include <new>
+#include <unistd.h>
+#include <stdio.h>
 #include <string.h>
 #include "unicorn_graph.h"
+#include "unicorn_library.h"
 
 #define NODE ((Node**)node_buffer->begin)
 #define PORT(node,port) (NODE[node]->portlist[port])
@@ -138,10 +141,18 @@ namespace u {
 		if (_port_marked(node, port) != -1)
 			return false;
 		PORT(node,port) = NODE[to];
+		_add_stencil(to, 255,node,port);
 		return true;
 	}
 	void Graph::unlink(int node, int port) {
 		PORT(node, port) = nullptr;
+		for (unsigned int i = 0; i < stencil_buffer->size;) {
+			auto cstencil = &STENCIL[i];
+
+			if ((cstencil->in_node == node) && (cstencil->in_port == port))
+				_del_stencil(i);
+			else i++;
+		}
 	}
 
 	bool Graph::connect(int node1, int port1, int node2, int port2){
@@ -149,7 +160,7 @@ namespace u {
 			return false;
 		if (_port_marked(node2, port2) != -1)
 			return false;
-		//The ports can be connected only <Free> to <Rigid>
+		//The ports can be connected only <External> to <Internal>
 
 		PortLocation _t1 = _get_port_location(node1, port1);
 		PortLocation _t2 = _get_port_location(node2, port2);
@@ -228,7 +239,142 @@ namespace u {
 	{
 		run_blocks(NODE[index]);
 	}
+	void fd_write_symbol(int fd, char sym)
+	{
+		char fd_write_symbol_char = sym;
+		write(fd, &fd_write_symbol_char, 1);
+	}
+	int fd_read_number(int fd)
+	{
+	    char buf;
+	    int ret = 0;
+	    buf=read(fd, &buf, 1);
+	    while (true) {
+	        buf=read(fd, &buf, 1);
+	        if((buf< '0') || (buf > '9'))
+	            return ret;
+	        ret *= 10;
+	        ret += (int)(buf - '0');
+	    };
+	}
+	static const Block* search_std_lib(char* s)
+	{
+		for (int lib = 0; lib < libraries_count; lib++) {
+			for (int bl = 0; bl < libraries[lib].count; bl++) {
+				if (strcmp(s, libraries[lib].blocks[bl].name) == 0) {
+					return &libraries[lib].blocks[bl];
+				}
+			}
+		}
+		return NULL;
+	}
+	void Graph::save_file(int fd)
+	{
+		int nodescnt = node_buffer->size;
+		write(fd, &nodescnt, sizeof(nodescnt));
+		for(Node **b = NODE; b < NODE + node_buffer->size; b++){
+			const char* nodename = (*b)->core->name;
+			write(fd, nodename, strlen(nodename));
+			fd_write_symbol(fd, '\0');
+			write(fd, &(*b)->xpos, sizeof((*b)->xpos));
+			write(fd, &(*b)->ypos, sizeof((*b)->ypos));
+			for (int port = 0; port < (*b)->ports; port++) {
+				PortDefinition def = node_port_get_definition((*b)->core, port);
+				if (node_port_get_location(def) == pl_internal) {
+					char dtype = node_port_get_datatype(def);
+					if(is_array_type(dtype)){
+						dtype = get_arr_type(dtype);
+						int size = ((uniseq*)((*b)->portlist[port]))->size;
+						write(fd, &size, sizeof(size));
+						write(fd, ((uniseq*)((*b)->portlist[port]))->begin, get_type_size(dtype)*size);
+					} else {
+						write(fd, (*b)->portlist[port], get_type_size(dtype));
+					}
+				}
+			}
+		}
 
+		int stencilcnt = stencil_buffer->size;
+		write(fd, &stencilcnt, sizeof(stencilcnt));
+		write(fd, STENCIL, sizeof(Stencil)*stencilcnt);
+		/*
+		write(fd, &mark_buffer->size, sizeof(mark_buffer->size));
+		for (unsigned int i = 0; i < mark_buffer->size; i++) {
+			Mark* m = (Mark*)mark_buffer->at(i);
+			write(fd, m->name->begin, strlen((char*)m->name->begin));
+			fd_write_symbol(fd, '@');
+			fd_write_number(fd, m->node);
+			fd_write_symbol(fd, ':');
+			fd_write_number(fd, m->port);
+		}*/
+	}
+
+	bool Graph::load_file(int fd)
+	{
+		char namebuffer[32];
+		
+		clear();
+
+		int nodescnt;
+		read(fd, &nodescnt, sizeof(nodescnt));
+		node_buffer->reserve(nodescnt);
+		for (int nd = 0; nd < nodescnt; nd++) {
+			int i = 0;
+			while (true) {
+				read(fd, &namebuffer[i], 1);
+				if (namebuffer[i] == '\0')
+					break;
+				i++;
+				if (i == 32)
+					goto error;
+			}
+			const Block* bl = search_std_lib(namebuffer);
+			if (!bl)
+				goto error;
+
+			int16_t xpos,ypos;
+			read(fd, &xpos, sizeof(xpos));
+			read(fd, &ypos, sizeof(ypos));
+
+			add_node(bl, xpos, ypos);
+
+			Node* bnd = *((Node**)node_buffer->back());
+			for (int port = 0; port < bnd->ports; port++) {
+				PortDefinition def = node_port_get_definition(bnd->core, port);
+				if (node_port_get_location(def) == pl_internal) {
+					char dtype = node_port_get_datatype(def);
+					if (is_array_type(dtype)) {
+						dtype = get_arr_type(dtype);
+						int size;
+						read(fd, &size, sizeof(size));
+						((uniseq*)bnd->portlist[port])->resize(size);
+						read(fd, ((uniseq*)(bnd->portlist[port]))->begin, get_type_size(dtype)*size);
+					}
+					else {
+						read(fd, bnd->portlist[port], get_type_size(dtype));
+					}
+				}
+			}
+		}
+
+		int stencilcnt;
+		read(fd, &stencilcnt, sizeof(stencilcnt));
+		stencil_buffer->resize(stencilcnt);
+		read(fd, STENCIL, sizeof(Stencil)*stencilcnt);
+		for (int i = 0; i < stencilcnt; i++) {
+			Stencil *st = STENCIL + i;
+			if (st->out_port == 255)
+				NODE[st->in_node]->portlist[st->in_port] = NODE[st->out_node];
+			else
+				NODE[st->in_node]->portlist[st->in_port] = NODE[st->out_node]->portlist[st->out_port];
+		}
+
+		return true;
+
+	error:
+		clear();
+		return false;
+	}
 
 	extern NodeTuneResult tune_dummy(Node* node, NodeTuneType tune_type);
 	static type::n* work_FunctionBlock(port** portlist)

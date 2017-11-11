@@ -4,6 +4,7 @@
 #include "unicorn_library.h"
 #include "unicorn_macro.h"
 
+
 namespace u
 {
 	type::n* work_dummy(port** portlist) {
@@ -13,56 +14,6 @@ namespace u
 		return ntr_ok;
 	}
 	const char* string_dummy = "";
-
-	/*
-	// char[5] is a dirty hack.
-	// And node->core->ports_cfg[3] is dirty hack.
-	// And magic number <5> is dirty hack.
-	// The whole function is one large dirty hack.
-	// TO THE GLORY OF SATAN
-	struct s_var_block_internal {
-		Block repr;
-		char ports_cfg[5];
-	};
-	NODE_TUNE(StdVariableBlock) {
-		switch (tune_type)
-		{
-		case u::ntt_manual: {
-
-			char prevtype = node->core->ports_cfg[3];
-
-			if (!node->internal) {
-				s_var_block_internal* wbuffer;
-				wbuffer = (s_var_block_internal*)U_NODE_INTERNAL_MALLOC(sizeof(s_var_block_internal));
-				if (!wbuffer)
-					return ntr_memory_error;
-				node->internal = wbuffer;
-
-				wbuffer->repr = *node->core;
-				wbuffer->repr.ports_cfg = wbuffer->ports_cfg;
-
-				memcpy(&wbuffer->ports_cfg, node->core->ports_cfg, 5);
-
-				node->core = &wbuffer->repr;
-			}
-
-			//Take the value from portlist[0] and make the output port of type 
-			type::t newtype = *(type::t*)node->portlist[0];
-			if (((s_var_block_internal*)node->internal)->ports_cfg[3] == newtype)
-				return ntr_ok;
-
-			port** oldportlist = node->portlist; // output port
-			setup_ports(node);
-			memcpy(node->portlist, oldportlist, 2 * sizeof(void*) + sizeof(type::t));
-
-			U_PORTS_FREE(oldportlist);
-			break;
-		}
-		default:
-			break;
-		};
-	}
-	*/
 
 	NODE_WORK(AddArithmeticBlock) {
 		_pl_var(i, 3) = _pl_var(i, 1) + _pl_var(i, 2);
@@ -157,11 +108,21 @@ namespace u
 		else
 			_pl_callnext(1);
 	}
+	NODE_WORK(RangeLoopBlock)
+	{
+		type::i times = _pl_var(i, 3);
+		
+		for (int i = 0; i < times; i++)
+		{
+			run_blocks(&_pl_var(n, 0));
+		}
+		_pl_callnext(1);
+	}
 
 	static const char* ports_ArithmeticBlock = ref_(n) in_(i) in_(i) out_(i);
 	static const char* ports_ComparisonBlock = ref_(n) in_(i) in_(i) out_(q);
 
-	const Block lib_standard[] = {
+	static const Block lib_standard_desc[] = {
 		//LIB_BLOCK_NOWORK(StdVariableBlock, "Var", "", param_(t) out_(t))
 
 		LIB_BLOCK_NOTUNE(AddArithmeticBlock, "+", "Add", ports_ArithmeticBlock)
@@ -180,7 +141,16 @@ namespace u
 		LIB_BLOCK_NOTUNE(LesserBlock, "<", "Lesser", ports_ComparisonBlock)
 		LIB_BLOCK_NOTUNE(GreaterEqualBlock, ">=", "Greater or Equal", ports_ComparisonBlock)
 		LIB_BLOCK_NOTUNE(LesserEqualBlock, "<=", "Lesser or Equal", ports_ComparisonBlock)
+
+		LIB_BLOCK_NOTUNE(BranchBlock, "if", "Branch block", 
+			ref_(n) ref_(n) in_(q))
+
+		LIB_BLOCK_NOTUNE(RangeLoopBlock, "loop", "Loop in range",
+			ref(n,bodys) ref(n,next) in(i,times) out(i,index))
+
 	};
 
-	const size_t lib_standard_count = sizeof(lib_standard) / sizeof(lib_standard[0]);
+	extern const Library lib_standard = { "Standard",
+		sizeof(lib_standard_desc) / sizeof(lib_standard_desc[0]), lib_standard_desc };
+
 }

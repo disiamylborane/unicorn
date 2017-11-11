@@ -2,6 +2,7 @@
 #include "unicorn_library.h"
 #include "unicorn_macro.h"
 
+
 namespace u {
 	void uniseq_linecode_add_value(type::i time, uniseq *out, bool addPulse)
 	{
@@ -208,7 +209,7 @@ namespace u {
 	}
 
 
-	const Block lib_linecode[] = {
+	const Block lib_linecode_desc[] = {
 	LIB_BLOCK_NOTUNE(PulseCodeModulationBlock,"PCM", "Pulse code modulation",
 		ref_(n) in(i,code) in(b,bitcount) in(ARR_i,one) in(ARR_i,zero) out(ARR_i, out))
 	LIB_BLOCK_NOTUNE(PulseCountModulationBlock, "P#M", "Pulse count modulation",
@@ -220,5 +221,6 @@ namespace u {
 		ref_(n) in(ARR_i, signal) in(ARR_i,one) in(ARR_i,zero) out(i,code) in(b,bitcnt) out(b,bitcnt) out(q,valid) out(q,broken))
 	};
 
-	const size_t lib_linecode_count = sizeof(lib_linecode) / sizeof(lib_linecode[0]);
+	extern const Library lib_linecode = { "Linecode",
+		sizeof(lib_linecode_desc) / sizeof(lib_linecode_desc[0]), lib_linecode_desc };
 }
